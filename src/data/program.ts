@@ -1,48 +1,48 @@
 import type { WorkoutDay } from '../types'
 
-const W = 'https://wger.de/media/exercise-images'
+const G = 'https://gymvisual.com/img/p'
 
 export const WORKOUT_PROGRAM: WorkoutDay[] = [
   {
     number: 1,
     title: 'Тренировка 1',
     exercises: [
-      { id: 'w1_press',    name: 'Пресс (подъём ног / молитва)',         sets: 3, repsRange: '15',   isWarmup: true,    imageUrl: `${W}/91/Crunches-1.png` },
-      { id: 'w1_hyperext', name: 'Гиперэкстензия',                        sets: 3, repsRange: '15',   isWarmup: true,    imageUrl: `${W}/128/Hyperextensions-1.png` },
-      { id: 'w1_bench',    name: 'Жим штанги лёжа',                       sets: 3, repsRange: '8–10',                    imageUrl: `${W}/192/Bench-press-1.png` },
-      { id: 'w1_row',      name: 'Тяга штанги к поясу',                   sets: 3, repsRange: '8–10',                    imageUrl: `${W}/109/Barbell-rear-delt-row-1.png` },
-      { id: 'w1_leg_curl', name: 'Сгибание ног',                          sets: 3, repsRange: '8–10',                    imageUrl: `${W}/364/b318dde9-f5f2-489f-940a-cd864affb9e3.png` },
-      { id: 'w1_bicep',    name: 'Подъём штанги на бицепс',               sets: 2, repsRange: '15–20', isAccessory: true, imageUrl: `${W}/74/Bicep-curls-1.png` },
-      { id: 'w1_ohp',      name: 'Жим гантелей / штанги над головой',     sets: 2, repsRange: '15–20', isAccessory: true, imageUrl: `${W}/123/dumbbell-shoulder-press-large-1.png` },
-      { id: 'w1_tricep',   name: 'Разгибание трицепса в блоке',           sets: 2, repsRange: '15–20', isAccessory: true, imageUrl: `${W}/1185/c5ca283d-8958-4fd8-9d59-a3f52a3ac66b.jpg` },
+      { id: 'w1_press',    name: 'Пресс (подъём ног / молитва)',         sets: 3, repsRange: '15',   isWarmup: true,    imageUrl: `${G}/4/7/3/9/4739.gif` },
+      { id: 'w1_hyperext', name: 'Гиперэкстензия',                        sets: 3, repsRange: '15',   isWarmup: true,    imageUrl: `${G}/2/0/8/2/5/20825.gif` },
+      { id: 'w1_bench',    name: 'Жим штанги лёжа',                       sets: 3, repsRange: '8–10',                    imageUrl: `${G}/3/3/1/3/8/33138.gif` },
+      { id: 'w1_row',      name: 'Тяга штанги к поясу',                   sets: 3, repsRange: '8–10',                    imageUrl: `${G}/1/0/6/1/7/10617.gif` },
+      { id: 'w1_leg_curl', name: 'Сгибание ног',                          sets: 3, repsRange: '8–10',                    imageUrl: `${G}/4/1/8/2/0/41820.gif` },
+      { id: 'w1_bicep',    name: 'Подъём штанги на бицепс',               sets: 2, repsRange: '15–20', isAccessory: true, imageUrl: `${G}/4/1/7/9/0/41790.gif` },
+      { id: 'w1_ohp',      name: 'Жим гантелей / штанги над головой',     sets: 2, repsRange: '15–20', isAccessory: true, imageUrl: `${G}/1/8/5/6/3/18563.gif` },
+      { id: 'w1_tricep',   name: 'Разгибание трицепса в блоке',           sets: 2, repsRange: '15–20', isAccessory: true, imageUrl: `${G}/7/0/7/6/7076.gif` },
     ],
   },
   {
     number: 2,
     title: 'Тренировка 2',
     exercises: [
-      { id: 'w2_press',      name: 'Пресс (подъём ног / молитва)',              sets: 3, repsRange: '15',   isWarmup: true,    imageUrl: `${W}/91/Crunches-1.png` },
-      { id: 'w2_hyperext',   name: 'Гиперэкстензия',                            sets: 3, repsRange: '15',   isWarmup: true,    imageUrl: `${W}/128/Hyperextensions-1.png` },
-      { id: 'w2_incline',    name: 'Жим гантели лёжа на наклонной (45°)',       sets: 3, repsRange: '8–10',                    imageUrl: `${W}/16/Incline-press-1.png` },
-      { id: 'w2_cable_row',  name: 'Тяга блока параллельным хватом',            sets: 3, repsRange: '8–10',                    imageUrl: `${W}/512/b938437e-ff00-4679-9036-acb41bb28bbd.png` },
-      { id: 'w2_leg_ext',    name: 'Разгибание ног',                            sets: 3, repsRange: '8–10',                    imageUrl: `${W}/369/78c915d1-e46d-4d30-8124-65d68664c3ef.png` },
-      { id: 'w2_hammer',     name: 'Подъём гантелей на бицепс «молот»',         sets: 2, repsRange: '15–20', isAccessory: true, imageUrl: `${W}/86/Bicep-hammer-curl-1.png` },
-      { id: 'w2_lateral',    name: 'Разведение гантелей в стороны',             sets: 2, repsRange: '15–20', isAccessory: true, imageUrl: `${W}/148/lateral-dumbbell-raises-large-2.png` },
-      { id: 'w2_skull',      name: 'Разгибание гантели над головой (трицепс)',  sets: 2, repsRange: '15–20', isAccessory: true, imageUrl: `${W}/1519/fab7f641-27d4-40b5-8edd-1a0a137bfd94.gif` },
+      { id: 'w2_press',      name: 'Пресс (подъём ног / молитва)',              sets: 3, repsRange: '15',   isWarmup: true,    imageUrl: `${G}/4/7/3/9/4739.gif` },
+      { id: 'w2_hyperext',   name: 'Гиперэкстензия',                            sets: 3, repsRange: '15',   isWarmup: true,    imageUrl: `${G}/2/0/8/2/5/20825.gif` },
+      { id: 'w2_incline',    name: 'Жим гантели лёжа на наклонной (45°)',       sets: 3, repsRange: '8–10',                    imageUrl: `${G}/1/4/1/1/4/14114.gif` },
+      { id: 'w2_cable_row',  name: 'Тяга блока параллельным хватом',            sets: 3, repsRange: '8–10',                    imageUrl: `${G}/4/8/9/2/4892.gif` },
+      { id: 'w2_leg_ext',    name: 'Разгибание ног',                            sets: 3, repsRange: '8–10',                    imageUrl: `${G}/9/2/1/1/9211.gif` },
+      { id: 'w2_hammer',     name: 'Подъём гантелей на бицепс «молот»',         sets: 2, repsRange: '15–20', isAccessory: true, imageUrl: `${G}/1/0/4/6/9/10469.gif` },
+      { id: 'w2_lateral',    name: 'Разведение гантелей в стороны',             sets: 2, repsRange: '15–20', isAccessory: true, imageUrl: `${G}/2/1/5/4/5/21545.gif` },
+      { id: 'w2_skull',      name: 'Разгибание гантели над головой (трицепс)',  sets: 2, repsRange: '15–20', isAccessory: true, imageUrl: `${G}/2/7/3/4/2/27342.gif` },
     ],
   },
   {
     number: 3,
     title: 'Тренировка 3',
     exercises: [
-      { id: 'w3_press',       name: 'Пресс (подъём ног / молитва)',  sets: 3, repsRange: '15',   isWarmup: true,    imageUrl: `${W}/91/Crunches-1.png` },
-      { id: 'w3_hyperext',    name: 'Гиперэкстензия',                sets: 3, repsRange: '15',   isWarmup: true,    imageUrl: `${W}/128/Hyperextensions-1.png` },
-      { id: 'w3_crossover',   name: 'Сведение в кроссовере',         sets: 3, repsRange: '8–10',                    imageUrl: `${W}/71/Cable-crossover-2.png` },
-      { id: 'w3_db_row',      name: 'Тяга гантели к поясу',          sets: 3, repsRange: '8–10',                    imageUrl: `${W}/1186/1987a039-cf35-437e-bbdc-40c53dd7d053.jpg` },
-      { id: 'w3_hip_thrust',  name: 'Ягодичный мост',                sets: 3, repsRange: '8–10',                    imageUrl: `${W}/1642/a81ad922-caf5-47f8-99b4-640cb0717436.webp` },
-      { id: 'w3_bicep_knee',  name: 'Бицепс с упором в колено',      sets: 2, repsRange: '15–20', isAccessory: true, imageUrl: `${W}/1649/441cc0e5-eca2-4828-8b0a-a0e554abb2ff.jpg` },
-      { id: 'w3_upright_row', name: 'Тяга штанги к подбородку',      sets: 2, repsRange: '15–20', isAccessory: true, imageUrl: `${W}/693/05c91bd2-7814-40b6-b2d1-51ae942b8321.png` },
-      { id: 'w3_french',      name: 'Французский жим',               sets: 2, repsRange: '15–20', isAccessory: true, imageUrl: `${W}/50/695ced5c-9961-4076-add2-cb250d01089e.png` },
+      { id: 'w3_press',       name: 'Пресс (подъём ног / молитва)',  sets: 3, repsRange: '15',   isWarmup: true,    imageUrl: `${G}/4/7/3/9/4739.gif` },
+      { id: 'w3_hyperext',    name: 'Гиперэкстензия',                sets: 3, repsRange: '15',   isWarmup: true,    imageUrl: `${G}/2/0/8/2/5/20825.gif` },
+      { id: 'w3_crossover',   name: 'Сведение в кроссовере',         sets: 3, repsRange: '8–10',                    imageUrl: `${G}/4/8/9/1/4891.gif` },
+      { id: 'w3_db_row',      name: 'Тяга гантели к поясу',          sets: 3, repsRange: '8–10',                    imageUrl: `${G}/1/0/4/0/3/10403.gif` },
+      { id: 'w3_hip_thrust',  name: 'Ягодичный мост',                sets: 3, repsRange: '8–10',                    imageUrl: `${G}/5/7/6/1/5761.gif` },
+      { id: 'w3_bicep_knee',  name: 'Бицепс с упором в колено',      sets: 2, repsRange: '15–20', isAccessory: true, imageUrl: `${G}/7/6/2/9/7629.gif` },
+      { id: 'w3_upright_row', name: 'Тяга штанги к подбородку',      sets: 2, repsRange: '15–20', isAccessory: true, imageUrl: `${G}/1/0/2/8/9/10289.gif` },
+      { id: 'w3_french',      name: 'Французский жим',               sets: 2, repsRange: '15–20', isAccessory: true, imageUrl: `${G}/6/9/7/1/6971.gif` },
     ],
   },
 ]

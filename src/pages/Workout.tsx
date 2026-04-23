@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { WORKOUT_PROGRAM, WEEK_REPS, getTargetReps } from '../data/program'
 import { createSession, getLastSetsForExercise, saveSets } from '../lib/supabase'
 import { tg, getTelegramUserId } from '../lib/tg'
+import { ExerciseModal } from '../components/ExerciseModal'
 import type { Exercise, SetEntry } from '../types'
 
 interface Props {
@@ -46,6 +47,7 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
   )
   const [saving, setSaving] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(day.exercises[0]?.id ?? null)
+  const [modalExercise, setModalExercise] = useState<Exercise | null>(null)
 
   const saveRef = useRef<() => void>(() => {})
 
@@ -188,12 +190,18 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
                   expanded={expandedId === exercise.id}
                   onToggle={() => setExpandedId((prev) => (prev === exercise.id ? null : exercise.id))}
                   onUpdate={(i, field, val) => updateSet(exercise.id, i, field, val)}
+                  onInfo={() => {
+                    tg?.HapticFeedback.impactOccurred('light')
+                    setModalExercise(exercise)
+                  }}
                 />
               ))}
             </div>
           </div>
         )
       })}
+
+      <ExerciseModal exercise={modalExercise} onClose={() => setModalExercise(null)} />
 
       {!tg && (
         <button
@@ -220,9 +228,10 @@ interface CardProps {
   expanded: boolean
   onToggle: () => void
   onUpdate: (index: number, field: 'weight' | 'reps', value: string) => void
+  onInfo: () => void
 }
 
-function ExerciseCard({ exercise, sets, weekNumber, expanded, onToggle, onUpdate }: CardProps) {
+function ExerciseCard({ exercise, sets, weekNumber, expanded, onToggle, onUpdate, onInfo }: CardProps) {
   const target = getTargetReps(weekNumber, exercise.isAccessory ?? false, exercise.isWarmup ?? false)
   const filledSets = sets.filter((s) => !s.isWarmup && (s.weight != null || s.reps != null)).length
   const hitSets = sets.filter((s) => !s.isWarmup && getRepsStatus(s.reps, target) === 'hit').length
@@ -248,9 +257,23 @@ function ExerciseCard({ exercise, sets, weekNumber, expanded, onToggle, onUpdate
         }}
       >
         <div style={{ flex: 1, marginRight: 8 }}>
-          <p style={{ fontWeight: 600, fontSize: 15, color: 'var(--tg-theme-text-color, #000)', marginBottom: 4 }}>
-            {exercise.name}
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <p style={{ fontWeight: 600, fontSize: 15, color: 'var(--tg-theme-text-color, #000)', flex: 1 }}>
+              {exercise.name}
+            </p>
+            {exercise.imageUrl && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onInfo() }}
+                style={{
+                  width: 26, height: 26, borderRadius: '50%', border: 'none', cursor: 'pointer', flexShrink: 0,
+                  background: 'rgba(36,129,204,0.15)', color: 'var(--tg-theme-button-color, #2481cc)',
+                  fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                ?
+              </button>
+            )}
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{
               fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 6,
@@ -268,6 +291,7 @@ function ExerciseCard({ exercise, sets, weekNumber, expanded, onToggle, onUpdate
             )}
           </div>
         </div>
+
         <span style={{ fontSize: 18, color: 'var(--tg-theme-hint-color, #999)', transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
           ▾
         </span>

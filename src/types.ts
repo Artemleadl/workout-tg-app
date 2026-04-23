@@ -5,6 +5,7 @@ export interface Exercise {
   repsRange: string
   isWarmup?: boolean
   isAccessory?: boolean
+  imageUrl?: string
 }
 
 export interface WorkoutDay {

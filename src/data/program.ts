@@ -45,9 +45,24 @@ export const WORKOUT_PROGRAM: WorkoutDay[] = [
   },
 ]
 
+// Целевые повторы по неделям: [min, max]
+export const WEEK_REPS: Record<number, { main: [number, number]; accessory: [number, number]; rir: string }> = {
+  1: { main: [8, 10], accessory: [12, 16], rir: '1–2 в запасе' },
+  2: { main: [8, 10], accessory: [12, 16], rir: '1–2 в запасе' },
+  3: { main: [8, 10], accessory: [12, 16], rir: '0–1 в запасе' },
+  4: { main: [6, 8],  accessory: [10, 12], rir: '0–1 в запасе' },
+}
+
 export const WEEK_SCHEME = [
   { week: 1, label: 'Неделя 1 — втягивающая', mainReps: '8–10', mainRPE: '1–2 в запасе' },
   { week: 2, label: 'Неделя 2', mainReps: '8–10', mainRPE: '1–2 в запасе' },
   { week: 3, label: 'Неделя 3', mainReps: '8–10', mainRPE: '0–1 в запасе' },
   { week: 4, label: 'Неделя 4', mainReps: '6–8', mainRPE: '0–1 в запасе' },
 ]
+
+export function getTargetReps(weekNumber: number, isAccessory: boolean, isWarmup: boolean): [number, number] | null {
+  if (isWarmup) return null
+  const scheme = WEEK_REPS[weekNumber]
+  if (!scheme) return null
+  return isAccessory ? scheme.accessory : scheme.main
+}

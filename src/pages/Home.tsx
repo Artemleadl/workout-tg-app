@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { WORKOUT_PROGRAM, WEEK_SCHEME } from '../data/program'
-import { getTelegramUserName } from '../lib/tg'
+import { getTelegramUserName, getTelegramUserId } from '../lib/tg'
+import { getCompletedWorkoutsForWeek } from '../lib/supabase'
 
 interface Props {
   onSelectWorkout: (workoutNumber: 1 | 2 | 3, weekNumber: number) => void
@@ -9,7 +10,9 @@ interface Props {
 
 export function Home({ onSelectWorkout, onOpenProgress }: Props) {
   const [selectedWeek, setSelectedWeek] = useState(1)
+  const [completedWorkouts, setCompletedWorkouts] = useState<number[]>([])
   const name = getTelegramUserName()
+  const userId = getTelegramUserId()
 
   const today = new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })
 
@@ -17,6 +20,11 @@ export function Home({ onSelectWorkout, onOpenProgress }: Props) {
     const stored = localStorage.getItem('currentWeek')
     if (stored) setSelectedWeek(Number(stored))
   }, [])
+
+  useEffect(() => {
+    if (!userId) return
+    getCompletedWorkoutsForWeek(userId, selectedWeek).then(setCompletedWorkouts)
+  }, [userId, selectedWeek])
 
   function handleWeekChange(week: number) {
     setSelectedWeek(week)
@@ -78,6 +86,7 @@ export function Home({ onSelectWorkout, onOpenProgress }: Props) {
       </p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
         {WORKOUT_PROGRAM.map((day) => {
+          const isDone = completedWorkouts.includes(day.number)
           const mainExercises = day.exercises.filter((e) => !e.isWarmup && !e.isAccessory)
           return (
             <button
@@ -87,8 +96,8 @@ export function Home({ onSelectWorkout, onOpenProgress }: Props) {
                 width: '100%',
                 padding: '16px',
                 borderRadius: 14,
-                border: '1px solid var(--tg-theme-secondary-bg-color, #e8e8e8)',
-                background: 'var(--tg-theme-secondary-bg-color, #f8f8f8)',
+                border: isDone ? '1.5px solid #34c759' : '1px solid var(--tg-theme-secondary-bg-color, #e8e8e8)',
+                background: isDone ? 'rgba(52,199,89,0.07)' : 'var(--tg-theme-secondary-bg-color, #f8f8f8)',
                 cursor: 'pointer',
                 textAlign: 'left',
                 transition: 'opacity 0.15s',
@@ -97,16 +106,21 @@ export function Home({ onSelectWorkout, onOpenProgress }: Props) {
               <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
                 <span style={{
                   width: 32, height: 32, borderRadius: 8,
-                  background: 'var(--tg-theme-button-color, #2481cc)',
-                  color: 'var(--tg-theme-button-text-color, #fff)',
+                  background: isDone ? '#34c759' : 'var(--tg-theme-button-color, #2481cc)',
+                  color: '#fff',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontWeight: 700, fontSize: 15, marginRight: 10, flexShrink: 0,
                 }}>
-                  {day.number}
+                  {isDone ? '✓' : day.number}
                 </span>
-                <span style={{ fontWeight: 600, fontSize: 16, color: 'var(--tg-theme-text-color, #000)' }}>
+                <span style={{ fontWeight: 600, fontSize: 16, color: 'var(--tg-theme-text-color, #000)', flex: 1 }}>
                   {day.title}
                 </span>
+                {isDone && (
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#34c759' }}>
+                    Выполнено
+                  </span>
+                )}
               </div>
               <div style={{ fontSize: 13, color: 'var(--tg-theme-hint-color, #888)', lineHeight: 1.5 }}>
                 {mainExercises.map((e) => e.name).join(' · ')}

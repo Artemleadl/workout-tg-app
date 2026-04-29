@@ -45,6 +45,9 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
   const [logs, setLogs] = useState<ExerciseLogs>(() =>
     Object.fromEntries(day.exercises.map((e) => [e.id, makeDefaultSets(e)])),
   )
+  const [doneSets, setDoneSets] = useState<Record<string, boolean[]>>(() =>
+    Object.fromEntries(day.exercises.map((e) => [e.id, Array(e.sets).fill(false)])),
+  )
   const [saving, setSaving] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(day.exercises[0]?.id ?? null)
   const [modalExercise, setModalExercise] = useState<Exercise | null>(null)
@@ -118,6 +121,15 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
     }
   }, [onBack])
 
+  function toggleDoneSet(exerciseId: string, setIndex: number) {
+    tg?.HapticFeedback.impactOccurred('light')
+    setDoneSets((prev) => {
+      const arr = [...prev[exerciseId]]
+      arr[setIndex] = !arr[setIndex]
+      return { ...prev, [exerciseId]: arr }
+    })
+  }
+
   function updateSet(exerciseId: string, setIndex: number, field: 'weight' | 'reps', value: string) {
     const num = value === '' ? null : parseFloat(value)
     setLogs((prev) => {
@@ -186,10 +198,12 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
                   key={exercise.id}
                   exercise={exercise}
                   sets={logs[exercise.id]}
+                  doneSets={doneSets[exercise.id]}
                   weekNumber={weekNumber}
                   expanded={expandedId === exercise.id}
                   onToggle={() => setExpandedId((prev) => (prev === exercise.id ? null : exercise.id))}
                   onUpdate={(i, field, val) => updateSet(exercise.id, i, field, val)}
+                  onToggleDone={(i) => toggleDoneSet(exercise.id, i)}
                   onInfo={() => {
                     tg?.HapticFeedback.impactOccurred('light')
                     setModalExercise(exercise)
@@ -224,27 +238,32 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
 interface CardProps {
   exercise: Exercise
   sets: SetEntry[]
+  doneSets: boolean[]
   weekNumber: number
   expanded: boolean
   onToggle: () => void
   onUpdate: (index: number, field: 'weight' | 'reps', value: string) => void
+  onToggleDone: (index: number) => void
   onInfo: () => void
 }
 
-function ExerciseCard({ exercise, sets, weekNumber, expanded, onToggle, onUpdate, onInfo }: CardProps) {
+function ExerciseCard({ exercise, sets, doneSets, weekNumber, expanded, onToggle, onUpdate, onToggleDone, onInfo }: CardProps) {
   const target = getTargetReps(weekNumber, exercise.isAccessory ?? false, exercise.isWarmup ?? false)
   const filledSets = sets.filter((s) => !s.isWarmup && (s.weight != null || s.reps != null)).length
   const hitSets = sets.filter((s) => !s.isWarmup && getRepsStatus(s.reps, target) === 'hit').length
   const workingSets = sets.filter((s) => !s.isWarmup).length
+  const doneCount = doneSets.filter(Boolean).length
+  const allDone = doneSets.length > 0 && doneCount === doneSets.length
 
   const targetLabel = target ? `${target[0]}–${target[1]}` : exercise.repsRange
 
   return (
     <div style={{
       borderRadius: 14,
-      background: 'var(--tg-theme-secondary-bg-color, #f8f8f8)',
-      border: '1px solid var(--tg-theme-secondary-bg-color, #e8e8e8)',
+      background: allDone ? 'rgba(52,199,89,0.06)' : 'var(--tg-theme-secondary-bg-color, #f8f8f8)',
+      border: allDone ? '1.5px solid #34c759' : '1px solid var(--tg-theme-secondary-bg-color, #e8e8e8)',
       overflow: 'hidden',
+      transition: 'border-color 0.2s, background 0.2s',
     }}>
       {/* Header */}
       <button
@@ -289,6 +308,14 @@ function ExerciseCard({ exercise, sets, weekNumber, expanded, onToggle, onUpdate
                 {hitSets === workingSets ? '✓' : `${hitSets}/${workingSets}`} в цель
               </span>
             )}
+            {doneCount > 0 && (
+              <span style={{
+                fontSize: 12, fontWeight: 600,
+                color: allDone ? '#34c759' : 'var(--tg-theme-hint-color, #999)',
+              }}>
+                {allDone ? '✅ выполнено' : `${doneCount}/${doneSets.length} подх.`}
+              </span>
+            )}
           </div>
         </div>
 
@@ -319,19 +346,25 @@ function ExerciseCard({ exercise, sets, weekNumber, expanded, onToggle, onUpdate
           {sets.map((set, i) => {
             const status = set.isWarmup ? 'idle' : getRepsStatus(set.reps, target)
             const colors = STATUS_COLORS[status]
+            const isDoneSet = doneSets[i] ?? false
             return (
               <div
                 key={i}
                 style={{ display: 'grid', gridTemplateColumns: '32px 1fr 1fr', gap: 8, marginBottom: 8, alignItems: 'center' }}
               >
-                <span style={{
-                  width: 28, height: 28, borderRadius: 8,
-                  background: set.isWarmup ? '#aaa' : 'var(--tg-theme-button-color, #2481cc)',
-                  color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 12, fontWeight: 700, flexShrink: 0,
-                }}>
-                  {set.isWarmup ? 'W' : set.setNumber}
-                </span>
+                <button
+                  onClick={() => onToggleDone(i)}
+                  style={{
+                    width: 28, height: 28, borderRadius: 8,
+                    background: isDoneSet ? '#34c759' : set.isWarmup ? '#aaa' : 'var(--tg-theme-button-color, #2481cc)',
+                    color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 12, fontWeight: 700, flexShrink: 0,
+                    border: 'none', cursor: 'pointer',
+                    transition: 'background 0.15s',
+                  }}
+                >
+                  {isDoneSet ? '✓' : set.isWarmup ? 'W' : set.setNumber}
+                </button>
                 <input
                   type="number"
                   inputMode="decimal"

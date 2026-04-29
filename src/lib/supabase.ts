@@ -103,6 +103,19 @@ export async function getProgressData(
   }))
 }
 
+export async function getCompletedWorkoutsForWeek(
+  telegramUserId: number,
+  weekNumber: number,
+): Promise<number[]> {
+  const { data } = await supabase
+    .from('workout_sessions')
+    .select('workout_number')
+    .eq('telegram_user_id', telegramUserId)
+    .eq('week_number', weekNumber)
+  if (!data) return []
+  return [...new Set(data.map((r: { workout_number: number }) => r.workout_number))]
+}
+
 function toWorkoutSet(row: Record<string, unknown>): WorkoutSet {
   return {
     id: row.id as string,

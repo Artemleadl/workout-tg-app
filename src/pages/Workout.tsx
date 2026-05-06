@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { WORKOUT_PROGRAM, WEEK_REPS, getTargetReps } from '../data/program'
-import { createSession, getLastSetsForExercise, saveSets } from '../lib/supabase'
+import { createSession, getExistingSessionSets, getLastSetsForExercise, saveSets } from '../lib/supabase'
 import { tg, getTelegramUserId } from '../lib/tg'
 import { ExerciseModal } from '../components/ExerciseModal'
 import type { Exercise, SetEntry } from '../types'
@@ -57,24 +57,51 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
 
   useEffect(() => {
     if (!userId) return
-    for (const exercise of day.exercises) {
-      getLastSetsForExercise(userId, exercise.id)
-      .then((prevSets) => {
-        if (prevSets.length === 0) return
-        setLogs((prev) => {
-          const current = prev[exercise.id]
-          const updated = current.map((s) => {
-            const match = prevSets.find((p) => p.setNumber === s.setNumber)
-            if (!match) return s
-            // Заполняем только вес, только если пользователь ещё ничего не ввёл
-            return { ...s, weight: s.weight ?? match.weight }
+
+    // Сначала проверяем: есть ли уже выполненная сессия за эту неделю?
+    getExistingSessionSets(userId, workoutNumber, weekNumber)
+      .then((existingSets) => {
+        if (existingSets && existingSets.length > 0) {
+          // Тренировка уже выполнена — грузим ВСЕ данные и блокируем форму
+          setLogs((prev) => {
+            const next = { ...prev }
+            for (const exercise of day.exercises) {
+              const exerciseSets = existingSets.filter((s) => s.exerciseId === exercise.id)
+              if (exerciseSets.length === 0) continue
+              next[exercise.id] = prev[exercise.id].map((s) => {
+                const match = exerciseSets.find((p) => p.setNumber === s.setNumber)
+                return match ? { ...s, weight: match.weight, reps: match.reps } : s
+              })
+            }
+            return next
           })
-          return { ...prev, [exercise.id]: updated }
-        })
+          setSaved(true)
+          if (tg) {
+            tg.MainButton.text = '✓ Тренировка выполнена'
+            tg.MainButton.disable()
+          }
+        } else {
+          // Тренировка не выполнена — подгружаем только вес из предыдущей сессии
+          for (const exercise of day.exercises) {
+            getLastSetsForExercise(userId, exercise.id)
+              .then((prevSets) => {
+                if (prevSets.length === 0) return
+                setLogs((prev) => {
+                  const current = prev[exercise.id]
+                  const updated = current.map((s) => {
+                    const match = prevSets.find((p) => p.setNumber === s.setNumber)
+                    if (!match) return s
+                    return { ...s, weight: s.weight ?? match.weight }
+                  })
+                  return { ...prev, [exercise.id]: updated }
+                })
+              })
+              .catch((err) => console.error('prefill error:', exercise.id, err))
+          }
+        }
       })
-      .catch((err) => console.error('prefill error:', exercise.id, err))
-    }
-  }, [day.exercises, userId])
+      .catch((err) => console.error('existing session error:', err))
+  }, [day.exercises, userId, workoutNumber, weekNumber])
 
   async function handleSave() {
     setSaving(true)

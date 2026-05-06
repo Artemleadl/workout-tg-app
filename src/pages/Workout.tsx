@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { WORKOUT_PROGRAM, WEEK_REPS, getTargetReps } from '../data/program'
-import { createSession, getExistingSessionSets, getLastSetsForExercise, saveSets } from '../lib/supabase'
+import { createSession, getExistingSession, getLastSetsForExercise, replaceSets, saveSets } from '../lib/supabase'
 import { tg, getTelegramUserId } from '../lib/tg'
 import { ExerciseModal } from '../components/ExerciseModal'
 import type { Exercise, SetEntry } from '../types'
@@ -50,6 +50,7 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
   )
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [existingSessionId, setExistingSessionId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(day.exercises[0]?.id ?? null)
   const [modalExercise, setModalExercise] = useState<Exercise | null>(null)
 
@@ -59,14 +60,15 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
     if (!userId) return
 
     // Сначала проверяем: есть ли уже выполненная сессия за эту неделю?
-    getExistingSessionSets(userId, workoutNumber, weekNumber)
-      .then((existingSets) => {
-        if (existingSets && existingSets.length > 0) {
+    getExistingSession(userId, workoutNumber, weekNumber)
+      .then((existing) => {
+        if (existing) {
           // Тренировка уже выполнена — грузим ВСЕ данные и блокируем форму
+          setExistingSessionId(existing.sessionId)
           setLogs((prev) => {
             const next = { ...prev }
             for (const exercise of day.exercises) {
-              const exerciseSets = existingSets.filter((s) => s.exerciseId === exercise.id)
+              const exerciseSets = existing.sets.filter((s) => s.exerciseId === exercise.id)
               if (exerciseSets.length === 0) continue
               next[exercise.id] = prev[exercise.id].map((s) => {
                 const match = exerciseSets.find((p) => p.setNumber === s.setNumber)
@@ -103,18 +105,15 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
       .catch((err) => console.error('existing session error:', err))
   }, [day.exercises, userId, workoutNumber, weekNumber])
 
-  async function handleSave() {
+  async function doSave() {
     setSaving(true)
     tg?.MainButton.showProgress()
     try {
-      const today = new Date().toISOString().split('T')[0]
-      const session = await createSession(userId, workoutNumber, today, weekNumber)
-
       const allSets = Object.entries(logs).flatMap(([exerciseId, sets]) =>
         sets
           .filter((s) => s.weight != null || s.reps != null)
           .map((s) => ({
-            sessionId: session.id,
+            sessionId: '', // заполним ниже
             exerciseId,
             setNumber: s.setNumber,
             weight: s.weight,
@@ -123,7 +122,19 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
           })),
       )
 
-      await saveSets(allSets)
+      if (existingSessionId) {
+        // Пересохранение: удаляем старые подходы, вставляем новые в ту же сессию
+        const setsWithSession = allSets.map((s) => ({ ...s, sessionId: existingSessionId }))
+        await replaceSets(existingSessionId, setsWithSession)
+      } else {
+        // Первое сохранение: создаём новую сессию
+        const today = new Date().toISOString().split('T')[0]
+        const session = await createSession(userId, workoutNumber, today, weekNumber)
+        setExistingSessionId(session.id)
+        const setsWithSession = allSets.map((s) => ({ ...s, sessionId: session.id }))
+        await saveSets(setsWithSession)
+      }
+
       tg?.HapticFeedback.notificationOccurred('success')
       setSaved(true)
       if (tg) {
@@ -138,6 +149,26 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
     } finally {
       setSaving(false)
       tg?.MainButton.hideProgress()
+    }
+  }
+
+  async function handleSave() {
+    if (tg) {
+      tg.showConfirm('Сохранить тренировку?', (confirmed: boolean) => {
+        if (confirmed) doSave()
+      })
+    } else {
+      if (!window.confirm('Сохранить тренировку?')) return
+      await doSave()
+    }
+  }
+
+  function handleEdit() {
+    setSaved(false)
+    tg?.HapticFeedback.impactOccurred('medium')
+    if (tg) {
+      tg.MainButton.text = 'Сохранить тренировку'
+      tg.MainButton.enable()
     }
   }
 
@@ -255,20 +286,50 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
 
       <ExerciseModal exercise={modalExercise} onClose={() => setModalExercise(null)} />
 
-      {!tg && (
+      {/* Кнопка редактирования (показывается когда тренировка сохранена) */}
+      {saved && (
         <button
-          onClick={handleSave}
-          disabled={saving || saved}
+          onClick={handleEdit}
           style={{
-            width: '100%', padding: 14, borderRadius: 14, border: 'none',
-            background: saved ? '#34c759' : 'var(--tg-theme-button-color, #2481cc)',
-            color: '#fff', fontWeight: 600, fontSize: 16,
-            cursor: saving || saved ? 'default' : 'pointer',
-            marginTop: 16, opacity: saving ? 0.7 : 1,
+            width: '100%', padding: '12px 16px', borderRadius: 14, marginTop: 12,
+            border: '1.5px solid var(--tg-theme-button-color, #2481cc)',
+            background: 'transparent',
+            color: 'var(--tg-theme-button-color, #2481cc)',
+            fontWeight: 600, fontSize: 15, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
           }}
         >
-          {saving ? 'Сохраняю...' : saved ? '✓ Тренировка сохранена' : 'Сохранить тренировку'}
+          ✏️ Редактировать тренировку
         </button>
+      )}
+
+      {!tg && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
+          {!saved && (
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              style={{
+                width: '100%', padding: 14, borderRadius: 14, border: 'none',
+                background: 'var(--tg-theme-button-color, #2481cc)',
+                color: '#fff', fontWeight: 600, fontSize: 16,
+                cursor: saving ? 'default' : 'pointer',
+                opacity: saving ? 0.7 : 1,
+              }}
+            >
+              {saving ? 'Сохраняю...' : 'Сохранить тренировку'}
+            </button>
+          )}
+          {saved && (
+            <div style={{
+              padding: 14, borderRadius: 14, background: 'rgba(52,199,89,0.1)',
+              border: '1.5px solid #34c759', textAlign: 'center',
+              fontWeight: 600, fontSize: 16, color: '#34c759',
+            }}>
+              ✓ Тренировка сохранена
+            </div>
+          )}
+        </div>
       )}
     </div>
   )

@@ -109,13 +109,13 @@ export async function getProgressData(
   }))
 }
 
-// Загружает ВСЕ подходы из существующей сессии этой тренировки за эту неделю
+// Загружает сессию + ВСЕ подходы из существующей сессии этой тренировки за эту неделю
 // Если сессия найдена — тренировка уже выполнена, показываем все данные и блокируем форму
-export async function getExistingSessionSets(
+export async function getExistingSession(
   telegramUserId: number,
   workoutNumber: number,
   weekNumber: number,
-): Promise<WorkoutSet[] | null> {
+): Promise<{ sessionId: string; sets: WorkoutSet[] } | null> {
   const { data: sessions } = await supabase
     .from('workout_sessions')
     .select('id')
@@ -135,7 +135,17 @@ export async function getExistingSessionSets(
     .limit(100)
 
   if (!data || data.length === 0) return null
-  return data.map(toWorkoutSet)
+  return { sessionId: sessions[0].id, sets: data.map(toWorkoutSet) }
+}
+
+// Удаляет все подходы сессии и записывает новые (для редактирования уже сохранённой тренировки)
+export async function replaceSets(sessionId: string, sets: Omit<WorkoutSet, 'id'>[]): Promise<void> {
+  const { error } = await supabase
+    .from('workout_sets')
+    .delete()
+    .eq('session_id', sessionId)
+  if (error) throw error
+  if (sets.length > 0) await saveSets(sets)
 }
 
 export async function getCompletedWorkoutsForWeek(

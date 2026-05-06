@@ -39,40 +39,33 @@ export async function getLastSetsForExercise(
   telegramUserId: number,
   exerciseId: string,
 ): Promise<WorkoutSet[]> {
-  // Берём последние 30 сессий пользователя (по убыванию даты)
+  // Берём последние 20 сессий пользователя от новой к старой
   const { data: sessions } = await supabase
     .from('workout_sessions')
     .select('id')
     .eq('telegram_user_id', telegramUserId)
     .order('created_at', { ascending: false })
-    .limit(30)
+    .limit(20)
 
   if (!sessions || sessions.length === 0) return []
 
-  const sessionIds = sessions.map((s: { id: string }) => s.id)
+  // Перебираем сессии от самой свежей к старой
+  // Возвращаем подходы из первой сессии, где есть данные для этого упражнения
+  for (const { id: sessionId } of sessions) {
+    const { data } = await supabase
+      .from('workout_sets')
+      .select('*')
+      .eq('session_id', sessionId)
+      .eq('exercise_id', exerciseId)
+      .order('set_number', { ascending: true })
+      .limit(20)
 
-  // Получаем все подходы для этого упражнения из последних сессий (без лимита)
-  const { data, error } = await supabase
-    .from('workout_sets')
-    .select('*')
-    .in('session_id', sessionIds)
-    .eq('exercise_id', exerciseId)
-    .order('set_number', { ascending: true })
+    if (data && data.length > 0) {
+      return data.map(toWorkoutSet)
+    }
+  }
 
-  if (error) throw error
-  if (!data || data.length === 0) return []
-
-  const allSets = data.map(toWorkoutSet)
-
-  // Находим самую свежую сессию, в которой есть подходы для этого упражнения
-  // sessionIds уже отсортированы по created_at DESC
-  const mostRecentSessionId = sessionIds.find((id) =>
-    allSets.some((s) => s.sessionId === id),
-  )
-  if (!mostRecentSessionId) return []
-
-  // Возвращаем только подходы из самой последней сессии
-  return allSets.filter((s) => s.sessionId === mostRecentSessionId)
+  return []
 }
 
 export async function getProgressData(

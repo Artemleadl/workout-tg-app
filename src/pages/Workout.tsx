@@ -58,7 +58,8 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
   useEffect(() => {
     if (!userId) return
     for (const exercise of day.exercises) {
-      getLastSetsForExercise(userId, exercise.id).then((prevSets) => {
+      getLastSetsForExercise(userId, exercise.id)
+      .then((prevSets) => {
         if (prevSets.length === 0) return
         setLogs((prev) => {
           const current = prev[exercise.id]
@@ -71,6 +72,7 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
           return { ...prev, [exercise.id]: updated }
         })
       })
+      .catch((err) => console.error('prefill error:', exercise.id, err))
     }
   }, [day.exercises, userId])
 

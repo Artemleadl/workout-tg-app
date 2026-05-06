@@ -49,6 +49,7 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
     Object.fromEntries(day.exercises.map((e) => [e.id, Array(e.sets).fill(false)])),
   )
   const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(day.exercises[0]?.id ?? null)
   const [modalExercise, setModalExercise] = useState<Exercise | null>(null)
 
@@ -63,7 +64,9 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
           const current = prev[exercise.id]
           const updated = current.map((s) => {
             const match = prevSets.find((p) => p.setNumber === s.setNumber)
-            return match ? { ...s, weight: match.weight, reps: match.reps } : s
+            if (!match) return s
+            // Заполняем только вес, только если пользователь ещё ничего не ввёл
+            return { ...s, weight: s.weight ?? match.weight }
           })
           return { ...prev, [exercise.id]: updated }
         })
@@ -93,6 +96,11 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
 
       await saveSets(allSets)
       tg?.HapticFeedback.notificationOccurred('success')
+      setSaved(true)
+      if (tg) {
+        tg.MainButton.text = '✓ Тренировка сохранена'
+        tg.MainButton.disable()
+      }
       onDone()
     } catch (err) {
       console.error(err)
@@ -201,6 +209,7 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
                   doneSets={doneSets[exercise.id]}
                   weekNumber={weekNumber}
                   expanded={expandedId === exercise.id}
+                  disabled={saved}
                   onToggle={() => setExpandedId((prev) => (prev === exercise.id ? null : exercise.id))}
                   onUpdate={(i, field, val) => updateSet(exercise.id, i, field, val)}
                   onToggleDone={(i) => toggleDoneSet(exercise.id, i)}
@@ -220,15 +229,16 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
       {!tg && (
         <button
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || saved}
           style={{
             width: '100%', padding: 14, borderRadius: 14, border: 'none',
-            background: 'var(--tg-theme-button-color, #2481cc)',
-            color: '#fff', fontWeight: 600, fontSize: 16, cursor: 'pointer',
-            marginTop: 16,
+            background: saved ? '#34c759' : 'var(--tg-theme-button-color, #2481cc)',
+            color: '#fff', fontWeight: 600, fontSize: 16,
+            cursor: saving || saved ? 'default' : 'pointer',
+            marginTop: 16, opacity: saving ? 0.7 : 1,
           }}
         >
-          {saving ? 'Сохраняю...' : 'Сохранить тренировку'}
+          {saving ? 'Сохраняю...' : saved ? '✓ Тренировка сохранена' : 'Сохранить тренировку'}
         </button>
       )}
     </div>
@@ -241,13 +251,14 @@ interface CardProps {
   doneSets: boolean[]
   weekNumber: number
   expanded: boolean
+  disabled: boolean
   onToggle: () => void
   onUpdate: (index: number, field: 'weight' | 'reps', value: string) => void
   onToggleDone: (index: number) => void
   onInfo: () => void
 }
 
-function ExerciseCard({ exercise, sets, doneSets, weekNumber, expanded, onToggle, onUpdate, onToggleDone, onInfo }: CardProps) {
+function ExerciseCard({ exercise, sets, doneSets, weekNumber, expanded, disabled, onToggle, onUpdate, onToggleDone, onInfo }: CardProps) {
   const target = getTargetReps(weekNumber, exercise.isAccessory ?? false, exercise.isWarmup ?? false)
   const filledSets = sets.filter((s) => !s.isWarmup && (s.weight != null || s.reps != null)).length
   const hitSets = sets.filter((s) => !s.isWarmup && getRepsStatus(s.reps, target) === 'hit').length
@@ -353,13 +364,14 @@ function ExerciseCard({ exercise, sets, doneSets, weekNumber, expanded, onToggle
                 style={{ display: 'grid', gridTemplateColumns: '32px 1fr 1fr', gap: 8, marginBottom: 8, alignItems: 'center' }}
               >
                 <button
-                  onClick={() => onToggleDone(i)}
+                  onClick={() => !disabled && onToggleDone(i)}
+                  disabled={disabled}
                   style={{
                     width: 28, height: 28, borderRadius: 8,
                     background: isDoneSet ? '#34c759' : set.isWarmup ? '#aaa' : 'var(--tg-theme-button-color, #2481cc)',
                     color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 12, fontWeight: 700, flexShrink: 0,
-                    border: 'none', cursor: 'pointer',
+                    border: 'none', cursor: disabled ? 'default' : 'pointer',
                     transition: 'background 0.15s',
                   }}
                 >
@@ -371,7 +383,8 @@ function ExerciseCard({ exercise, sets, doneSets, weekNumber, expanded, onToggle
                   placeholder="0"
                   value={set.weight ?? ''}
                   onChange={(e) => onUpdate(i, 'weight', e.target.value)}
-                  style={{ ...baseInputStyle }}
+                  disabled={disabled}
+                  style={{ ...baseInputStyle, opacity: disabled ? 0.6 : 1 }}
                 />
                 <div style={{ position: 'relative' }}>
                   <input
@@ -380,12 +393,14 @@ function ExerciseCard({ exercise, sets, doneSets, weekNumber, expanded, onToggle
                     placeholder={target ? `${target[0]}–${target[1]}` : '0'}
                     value={set.reps ?? ''}
                     onChange={(e) => onUpdate(i, 'reps', e.target.value)}
+                    disabled={disabled}
                     style={{
                       ...baseInputStyle,
                       border: `1.5px solid ${colors.border}`,
                       background: colors.bg,
                       fontWeight: status !== 'idle' ? 700 : 500,
                       color: status === 'hit' ? '#34c759' : status === 'low' ? '#ff9500' : status === 'high' ? '#ff3b30' : 'var(--tg-theme-text-color, #000)',
+                      opacity: disabled ? 0.6 : 1,
                     }}
                   />
                   {status === 'hit' && set.reps != null && (

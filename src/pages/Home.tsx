@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { WORKOUT_PROGRAM, WEEK_SCHEME } from '../data/program'
 import { getTelegramUserName, getTelegramUserId } from '../lib/tg'
-import { getCompletedWorkoutsForWeek } from '../lib/supabase'
+import { getCompletedWorkoutsForWeek, getWorkoutFilledSets } from '../lib/supabase'
 
 interface Props {
   onSelectWorkout: (workoutNumber: 1 | 2 | 3, weekNumber: number) => void
@@ -11,6 +11,7 @@ interface Props {
 export function Home({ onSelectWorkout, onOpenProgress }: Props) {
   const [selectedWeek, setSelectedWeek] = useState(1)
   const [completedWorkouts, setCompletedWorkouts] = useState<number[]>([])
+  const [filledSets, setFilledSets] = useState<Record<number, number>>({})
   const name = getTelegramUserName()
   const userId = getTelegramUserId()
 
@@ -24,6 +25,7 @@ export function Home({ onSelectWorkout, onOpenProgress }: Props) {
   useEffect(() => {
     if (!userId) return
     getCompletedWorkoutsForWeek(userId, selectedWeek).then(setCompletedWorkouts)
+    getWorkoutFilledSets(userId, selectedWeek).then(setFilledSets)
   }, [userId, selectedWeek])
 
   function handleWeekChange(week: number) {
@@ -88,6 +90,15 @@ export function Home({ onSelectWorkout, onOpenProgress }: Props) {
         {WORKOUT_PROGRAM.map((day) => {
           const isDone = completedWorkouts.includes(day.number)
           const mainExercises = day.exercises.filter((e) => !e.isWarmup && !e.isAccessory)
+          // Ожидаемое кол-во рабочих подходов (не разминка)
+          const expectedSets = day.exercises
+            .filter((e) => !e.isWarmup)
+            .reduce((sum, e) => sum + e.sets, 0)
+          const filled = filledSets[day.number] ?? 0
+          const pct = isDone && expectedSets > 0
+            ? Math.round((filled / expectedSets) * 100)
+            : 0
+
           return (
             <button
               key={day.number}
@@ -117,8 +128,8 @@ export function Home({ onSelectWorkout, onOpenProgress }: Props) {
                   {day.title}
                 </span>
                 {isDone && (
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#34c759' }}>
-                    Выполнено
+                  <span style={{ fontSize: 13, fontWeight: 700, color: pct >= 100 ? '#34c759' : '#ff9500' }}>
+                    {pct}%
                   </span>
                 )}
               </div>

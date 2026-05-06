@@ -151,6 +151,43 @@ export async function getCompletedWorkoutsForWeek(
   return [...new Set(data.map((r: { workout_number: number }) => r.workout_number))]
 }
 
+// Возвращает кол-во рабочих подходов с данными для каждой выполненной тренировки
+export async function getWorkoutFilledSets(
+  telegramUserId: number,
+  weekNumber: number,
+): Promise<Record<number, number>> {
+  // Самая свежая сессия на каждую тренировку за эту неделю
+  const { data: sessions } = await supabase
+    .from('workout_sessions')
+    .select('id, workout_number')
+    .eq('telegram_user_id', telegramUserId)
+    .eq('week_number', weekNumber)
+    .order('created_at', { ascending: false })
+
+  if (!sessions || sessions.length === 0) return {}
+
+  // Берём только первую (самую свежую) сессию на каждый номер тренировки
+  const latest: Record<number, string> = {}
+  for (const s of sessions) {
+    if (!latest[s.workout_number]) latest[s.workout_number] = s.id
+  }
+
+  const result: Record<number, number> = {}
+  for (const [wn, sessionId] of Object.entries(latest)) {
+    const { data: sets } = await supabase
+      .from('workout_sets')
+      .select('weight, reps')
+      .eq('session_id', sessionId)
+      .eq('is_warmup', false)
+      .limit(50)
+
+    if (!sets) continue
+    result[Number(wn)] = sets.filter((s) => s.weight != null || s.reps != null).length
+  }
+
+  return result
+}
+
 function toWorkoutSet(row: Record<string, unknown>): WorkoutSet {
   return {
     id: row.id as string,

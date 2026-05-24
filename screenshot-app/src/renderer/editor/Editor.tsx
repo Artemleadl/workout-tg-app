@@ -1,16 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { EditorPayload } from '@shared/types'
-import {
-  bounds,
-  drawAnnotation,
-  hitTest,
-  newId,
-  translate,
-  type Annotation,
-  type Point,
-  type Tool
-} from './annotations'
+import { bounds, hitTest, newId, translate, type Annotation, type Point, type Tool } from './annotations'
 import { Toolbar } from './Toolbar'
+import { FrameBar } from './FrameBar'
+import { composeFrame, DEFAULT_FRAME, frameSize, type Frame } from './frame'
 import './editor.css'
 
 interface TextDraft {
@@ -40,6 +33,7 @@ export function Editor(): React.ReactElement {
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(false)
   const [uploadEnabled, setUploadEnabled] = useState(false)
+  const [frame, setFrame] = useState<Frame>(DEFAULT_FRAME)
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const baseRef = useRef<HTMLImageElement | null>(null)
@@ -103,16 +97,15 @@ export function Editor(): React.ReactElement {
     const canvas = canvasRef.current
     const base = baseRef.current
     const ctx = canvas?.getContext('2d')
-    if (!canvas || !base || !ctx) return
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
-    ctx.drawImage(base, 0, 0)
-    for (const a of annotations) drawAnnotation(ctx, a, base)
-    if (draft) drawAnnotation(ctx, draft, base)
+    if (!canvas || !base || !payload || !ctx) return
+    composeFrame(ctx, base, annotations, draft, frame, payload.width, payload.height)
     if (selectedId) {
       const a = annotations.find((x) => x.id === selectedId)
       if (a) {
+        const { pad } = frameSize(payload.width, payload.height, frame)
         const b = bounds(a)
         ctx.save()
+        ctx.translate(pad, pad)
         ctx.strokeStyle = '#4ea1ff'
         ctx.lineWidth = 2
         ctx.setLineDash([6, 4])
@@ -120,19 +113,21 @@ export function Editor(): React.ReactElement {
         ctx.restore()
       }
     }
-  }, [annotations, draft, selectedId])
+  }, [annotations, draft, selectedId, frame, payload])
 
   useEffect(() => {
     if (baseLoaded) redraw()
   }, [baseLoaded, redraw])
 
   // --- Pointer mapping ------------------------------------------------------
+  // Frame coordinates → base-image space (subtract the padding offset).
   const toImagePoint = (clientX: number, clientY: number): Point => {
     const canvas = canvasRef.current!
     const rect = canvas.getBoundingClientRect()
+    const pad = Math.round(frame.padding)
     return {
-      x: ((clientX - rect.left) / rect.width) * canvas.width,
-      y: ((clientY - rect.top) / rect.height) * canvas.height
+      x: ((clientX - rect.left) / rect.width) * canvas.width - pad,
+      y: ((clientY - rect.top) / rect.height) * canvas.height - pad
     }
   }
 
@@ -250,12 +245,12 @@ export function Editor(): React.ReactElement {
   const exportDataUrl = (): string => {
     const base = baseRef.current
     if (!base || !payload) return ''
+    const { w, h } = frameSize(payload.width, payload.height, frame)
     const out = document.createElement('canvas')
-    out.width = payload.width
-    out.height = payload.height
+    out.width = w
+    out.height = h
     const ctx = out.getContext('2d')!
-    ctx.drawImage(base, 0, 0)
-    for (const a of annsRef.current) drawAnnotation(ctx, a, base)
+    composeFrame(ctx, base, annsRef.current, null, frame, payload.width, payload.height)
     return out.toDataURL('image/png')
   }
 
@@ -344,13 +339,16 @@ export function Editor(): React.ReactElement {
     const canvas = canvasRef.current
     if (!canvas || !textDraft) return { display: 'none' }
     const scale = canvas.clientWidth / canvas.width
+    const pad = Math.round(frame.padding)
     return {
-      left: textDraft.x * scale,
-      top: textDraft.y * scale,
+      left: (textDraft.x + pad) * scale,
+      top: (textDraft.y + pad) * scale,
       fontSize: textDraft.fontSize * scale,
       color: textDraft.color
     }
   }
+
+  const size = payload ? frameSize(payload.width, payload.height, frame) : { w: 0, h: 0 }
 
   return (
     <div className="editor">
@@ -373,12 +371,14 @@ export function Editor(): React.ReactElement {
         busy={busy}
       />
 
+      <FrameBar frame={frame} setFrame={setFrame} />
+
       <div className="editor-stage">
         <div className="canvas-wrap">
           <canvas
             ref={canvasRef}
-            width={payload?.width ?? 0}
-            height={payload?.height ?? 0}
+            width={size.w}
+            height={size.h}
             className={tool === 'select' ? 'canvas select' : 'canvas draw'}
             onMouseDown={onMouseDown}
           />

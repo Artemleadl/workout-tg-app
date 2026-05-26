@@ -4,6 +4,7 @@ import { createSession, getExistingSession, getLastSetsForExercise, replaceExerc
 import { tg, getTelegramUserId } from '../lib/tg'
 import { ExerciseModal } from '../components/ExerciseModal'
 import { SparkleButton } from '../components/SparkleButton'
+import { NumberSpinner } from '../components/NumberSpinner'
 import type { Exercise, SetEntry } from '../types'
 
 interface Props {
@@ -325,11 +326,10 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
     setTimeout(() => setShowSetHint(false), 5000)
   }
 
-  function updateSet(exerciseId: string, setIndex: number, field: 'weight' | 'reps', value: string) {
-    const num = value === '' ? null : parseFloat(value)
+  function updateSet(exerciseId: string, setIndex: number, field: 'weight' | 'reps', value: number | null) {
     setLogs((prev) => {
       const sets = [...prev[exerciseId]]
-      sets[setIndex] = { ...sets[setIndex], [field]: num }
+      sets[setIndex] = { ...sets[setIndex], [field]: value }
       return { ...prev, [exerciseId]: sets }
     })
   }
@@ -524,7 +524,7 @@ interface CardProps {
   exerciseSaving: boolean
   workoutStarted: boolean
   onToggle: () => void
-  onUpdate: (index: number, field: 'weight' | 'reps', value: string) => void
+  onUpdate: (index: number, field: 'weight' | 'reps', value: number | null) => void
   onToggleDone: (index: number) => void
   onInfo: () => void
   onSaveExercise: () => void
@@ -676,39 +676,26 @@ function ExerciseCard({ exercise, sets, doneSets, weekNumber, expanded, disabled
                 >
                   {isDoneSet ? '✓' : set.isWarmup ? 'W' : set.setNumber}
                 </button>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  placeholder="0"
-                  value={set.weight ?? ''}
-                  onChange={(e) => onUpdate(i, 'weight', e.target.value)}
+                <NumberSpinner
+                  value={set.weight}
+                  onChange={(v) => onUpdate(i, 'weight', v)}
+                  step={2.5}
                   disabled={disabled || exerciseSaved}
-                  style={{ ...baseInputStyle, opacity: disabled || exerciseSaved ? 0.6 : 1 }}
                 />
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    placeholder={target ? `${target[0]}–${target[1]}` : '0'}
-                    value={set.reps ?? ''}
-                    onChange={(e) => onUpdate(i, 'reps', e.target.value)}
-                    disabled={disabled || exerciseSaved}
-                    style={{
-                      ...baseInputStyle,
-                      border: `1.5px solid ${colors.border}`,
-                      background: colors.bg,
-                      fontWeight: status !== 'idle' ? 700 : 500,
-                      color: status === 'hit' ? '#34c759' : status === 'low' ? '#ff9500' : status === 'high' ? '#ff3b30' : 'var(--tg-theme-text-color, #000)',
-                      opacity: disabled || exerciseSaved ? 0.6 : 1,
-                    }}
-                  />
-                  {status === 'hit' && set.reps != null && (
-                    <span style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', fontSize: 12 }}>✓</span>
-                  )}
-                  {status === 'low' && set.reps != null && (
-                    <span style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', fontSize: 12 }}>↑</span>
-                  )}
-                </div>
+                <NumberSpinner
+                  value={set.reps}
+                  onChange={(v) => onUpdate(i, 'reps', v)}
+                  step={1}
+                  placeholder={target ? `${target[0]}–${target[1]}` : '0'}
+                  disabled={disabled || exerciseSaved}
+                  borderColor={colors.border}
+                  bgColor={colors.bg}
+                  textColor={
+                    status === 'hit' ? '#34c759' :
+                    status === 'low' ? '#ff9500' :
+                    status === 'high' ? '#ff3b30' : undefined
+                  }
+                />
               </div>
             )
           })}
@@ -844,16 +831,3 @@ function LegendItem({ color, label }: { color: string; label: string }) {
   )
 }
 
-const baseInputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '10px 12px',
-  borderRadius: 10,
-  border: '1.5px solid var(--tg-theme-secondary-bg-color, #e0e0e0)',
-  background: 'var(--tg-theme-bg-color, #fff)',
-  color: 'var(--tg-theme-text-color, #000)',
-  fontSize: 15,
-  fontWeight: 500,
-  outline: 'none',
-  textAlign: 'center',
-  transition: 'border-color 0.15s, background 0.15s',
-}

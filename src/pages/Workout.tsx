@@ -3,6 +3,7 @@ import { WORKOUT_PROGRAM, WEEK_REPS, getTargetReps } from '../data/program'
 import { createSession, getExistingSession, getLastSetsForExercise, replaceExerciseSets, replaceSets, saveSets } from '../lib/supabase'
 import { tg, getTelegramUserId } from '../lib/tg'
 import { ExerciseModal } from '../components/ExerciseModal'
+import { SparkleButton } from '../components/SparkleButton'
 import type { Exercise, SetEntry } from '../types'
 
 interface Props {
@@ -386,18 +387,9 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
 
       {/* Start workout button */}
       {!workoutStarted && !saved && (
-        <button
-          onClick={startWorkout}
-          style={{
-            width: '100%', padding: '14px 16px', borderRadius: 14, border: 'none',
-            background: 'var(--tg-theme-button-color, #2481cc)',
-            color: '#fff', fontWeight: 700, fontSize: 17,
-            cursor: 'pointer', marginBottom: 20,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-          }}
-        >
-          ▶ Начать тренировку
-        </button>
+        <SparkleButton onClick={startWorkout}>
+          Начать тренировку
+        </SparkleButton>
       )}
 
       {showSetHint && (

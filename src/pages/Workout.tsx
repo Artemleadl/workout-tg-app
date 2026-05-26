@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { WORKOUT_PROGRAM, WEEK_REPS, getTargetReps } from '../data/program'
-import { createSession, getExistingSession, getLastSetsForExercise, replaceSets, saveSets } from '../lib/supabase'
+import { createSession, getExistingSession, getLastSetsForExercise, replaceExerciseSets, replaceSets, saveSets } from '../lib/supabase'
 import { tg, getTelegramUserId } from '../lib/tg'
 import { ExerciseModal } from '../components/ExerciseModal'
 import type { Exercise, SetEntry } from '../types'
@@ -51,20 +51,27 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [existingSessionId, setExistingSessionId] = useState<string | null>(null)
+  const [savedExerciseIds, setSavedExerciseIds] = useState<Set<string>>(new Set())
+  const [savingExerciseId, setSavingExerciseId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(day.exercises[0]?.id ?? null)
   const [modalExercise, setModalExercise] = useState<Exercise | null>(null)
+  const [workoutStarted, setWorkoutStarted] = useState(false)
+  const [workoutStartTime, setWorkoutStartTime] = useState<number | null>(null)
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const [restTimer, setRestTimer] = useState<{ seconds: number; mode: 'set' | 'exercise' } | null>(null)
+  const [showSetHint, setShowSetHint] = useState(false)
 
   const saveRef = useRef<() => void>(() => {})
 
   useEffect(() => {
     if (!userId) return
 
-    // Сначала проверяем: есть ли уже выполненная сессия за эту неделю?
     getExistingSession(userId, workoutNumber, weekNumber)
       .then((existing) => {
         if (existing) {
-          // Тренировка уже выполнена — грузим ВСЕ данные и блокируем форму
           setExistingSessionId(existing.sessionId)
+
+          // Загружаем данные из существующей сессии
           setLogs((prev) => {
             const next = { ...prev }
             for (const exercise of day.exercises) {
@@ -77,13 +84,44 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
             }
             return next
           })
-          setSaved(true)
-          if (tg) {
-            tg.MainButton.text = '✓ Тренировка выполнена'
-            tg.MainButton.disable()
+
+          // Какие упражнения уже сохранены
+          const savedIds = new Set(existing.sets.map((s) => s.exerciseId))
+          setSavedExerciseIds(savedIds)
+
+          // Тренировка полностью завершена, если все рабочие упражнения имеют подходы
+          const workingExercises = day.exercises.filter((e) => !e.isWarmup)
+          const isComplete = workingExercises.every((e) => savedIds.has(e.id))
+
+          if (isComplete) {
+            setSaved(true)
+            if (tg) {
+              tg.MainButton.text = '✓ Тренировка выполнена'
+              tg.MainButton.disable()
+            }
+          }
+
+          // Для незаполненных упражнений подтягиваем вес из предыдущих сессий
+          for (const exercise of day.exercises) {
+            if (!savedIds.has(exercise.id)) {
+              getLastSetsForExercise(userId, exercise.id)
+                .then((prevSets) => {
+                  if (prevSets.length === 0) return
+                  setLogs((prev) => {
+                    const current = prev[exercise.id]
+                    const updated = current.map((s) => {
+                      const match = prevSets.find((p) => p.setNumber === s.setNumber)
+                      if (!match) return s
+                      return { ...s, weight: s.weight ?? match.weight }
+                    })
+                    return { ...prev, [exercise.id]: updated }
+                  })
+                })
+                .catch((err) => console.error('prefill error:', exercise.id, err))
+            }
           }
         } else {
-          // Тренировка не выполнена — подгружаем только вес из предыдущей сессии
+          // Новая тренировка — подгружаем вес из предыдущих сессий
           for (const exercise of day.exercises) {
             getLastSetsForExercise(userId, exercise.id)
               .then((prevSets) => {
@@ -152,6 +190,49 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
     }
   }
 
+  async function saveExercise(exerciseId: string) {
+    setSavingExerciseId(exerciseId)
+    try {
+      const today = new Date().toISOString().split('T')[0]
+
+      let sid = existingSessionId
+      if (!sid) {
+        const session = await createSession(userId, workoutNumber, today, weekNumber)
+        sid = session.id
+        setExistingSessionId(sid)
+      }
+
+      const exerciseSets = logs[exerciseId]
+        .filter((s) => s.weight != null || s.reps != null)
+        .map((s) => ({
+          sessionId: sid!,
+          exerciseId,
+          setNumber: s.setNumber,
+          weight: s.weight,
+          reps: s.reps,
+          isWarmup: s.isWarmup,
+        }))
+
+      await replaceExerciseSets(sid, exerciseId, exerciseSets)
+      setSavedExerciseIds((prev) => new Set([...prev, exerciseId]))
+      tg?.HapticFeedback.notificationOccurred('success')
+    } catch (err) {
+      console.error(err)
+      tg?.HapticFeedback.notificationOccurred('error')
+      alert('Ошибка сохранения. Проверь соединение.')
+    } finally {
+      setSavingExerciseId(null)
+    }
+  }
+
+  function editExercise(exerciseId: string) {
+    setSavedExerciseIds((prev) => {
+      const next = new Set(prev)
+      next.delete(exerciseId)
+      return next
+    })
+  }
+
   async function handleSave() {
     if (tg) {
       tg.showConfirm('Сохранить тренировку?', (confirmed: boolean) => {
@@ -165,12 +246,36 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
 
   function handleEdit() {
     setSaved(false)
+    setSavedExerciseIds(new Set())
     tg?.HapticFeedback.impactOccurred('medium')
     if (tg) {
       tg.MainButton.text = 'Сохранить тренировку'
       tg.MainButton.enable()
     }
   }
+
+  // Elapsed workout time ticker
+  useEffect(() => {
+    if (!workoutStarted || !workoutStartTime) return
+    const id = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - workoutStartTime) / 1000))
+    }, 1000)
+    return () => clearInterval(id)
+  }, [workoutStarted, workoutStartTime])
+
+  // Rest timer countdown
+  useEffect(() => {
+    if (restTimer === null) return
+    if (restTimer.seconds <= 0) {
+      tg?.HapticFeedback.notificationOccurred('success')
+      const id = setTimeout(() => setRestTimer(null), 800)
+      return () => clearTimeout(id)
+    }
+    const id = setTimeout(() => {
+      setRestTimer((prev) => (prev ? { ...prev, seconds: prev.seconds - 1 } : null))
+    }, 1000)
+    return () => clearTimeout(id)
+  }, [restTimer])
 
   saveRef.current = handleSave
 
@@ -191,11 +296,32 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
 
   function toggleDoneSet(exerciseId: string, setIndex: number) {
     tg?.HapticFeedback.impactOccurred('light')
+    const currentArr = doneSets[exerciseId]
+    const wasChecked = currentArr[setIndex]
+
     setDoneSets((prev) => {
       const arr = [...prev[exerciseId]]
       arr[setIndex] = !arr[setIndex]
       return { ...prev, [exerciseId]: arr }
     })
+
+    if (workoutStarted && !wasChecked) {
+      const newArr = [...currentArr]
+      newArr[setIndex] = true
+      const allDone = newArr.every(Boolean)
+      tg?.HapticFeedback.impactOccurred('medium')
+      setRestTimer({ seconds: allDone ? 120 : 60, mode: allDone ? 'exercise' : 'set' })
+      setShowSetHint(false)
+    }
+  }
+
+  function startWorkout() {
+    setWorkoutStarted(true)
+    setWorkoutStartTime(Date.now())
+    setShowSetHint(true)
+    tg?.HapticFeedback.impactOccurred('medium')
+    setExpandedId(day.exercises[0]?.id ?? null)
+    setTimeout(() => setShowSetHint(false), 5000)
   }
 
   function updateSet(exerciseId: string, setIndex: number, field: 'weight' | 'reps', value: string) {
@@ -208,9 +334,23 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
   }
 
   return (
-    <div style={{ padding: '16px', maxWidth: 480, margin: '0 auto', paddingBottom: 80 }}>
+    <div style={{ padding: '16px', maxWidth: 480, margin: '0 auto', paddingBottom: restTimer ? 200 : 80 }}>
       <div style={{ marginBottom: 16 }}>
-        <h2 style={{ fontSize: 22, fontWeight: 700 }}>{day.title}</h2>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h2 style={{ fontSize: 22, fontWeight: 700 }}>{day.title}</h2>
+          {workoutStarted && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '4px 10px', borderRadius: 20,
+              background: 'rgba(52,199,89,0.12)', border: '1px solid rgba(52,199,89,0.3)',
+            }}>
+              <span style={{ fontSize: 14 }}>⏱</span>
+              <span style={{ fontWeight: 700, fontSize: 15, fontVariantNumeric: 'tabular-nums', color: '#34c759' }}>
+                {formatTime(elapsedSeconds)}
+              </span>
+            </div>
+          )}
+        </div>
         <p style={{ fontSize: 13, color: 'var(--tg-theme-hint-color, #999)', marginTop: 2 }}>
           Неделя {weekNumber} · {new Date().toLocaleDateString('ru-RU')}
         </p>
@@ -244,6 +384,35 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
         </div>
       </div>
 
+      {/* Start workout button */}
+      {!workoutStarted && !saved && (
+        <button
+          onClick={startWorkout}
+          style={{
+            width: '100%', padding: '14px 16px', borderRadius: 14, border: 'none',
+            background: 'var(--tg-theme-button-color, #2481cc)',
+            color: '#fff', fontWeight: 700, fontSize: 17,
+            cursor: 'pointer', marginBottom: 20,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          }}
+        >
+          ▶ Начать тренировку
+        </button>
+      )}
+
+      {showSetHint && (
+        <div style={{
+          marginBottom: 16, padding: '10px 14px', borderRadius: 12,
+          background: 'rgba(36,129,204,0.1)', border: '1px solid rgba(36,129,204,0.3)',
+          display: 'flex', alignItems: 'center', gap: 8,
+        }}>
+          <span style={{ fontSize: 18 }}>💡</span>
+          <p style={{ fontSize: 13, color: 'var(--tg-theme-button-color, #2481cc)', fontWeight: 500 }}>
+            После каждого подхода нажми на его номер — запустится таймер отдыха
+          </p>
+        </div>
+      )}
+
       {/* Section labels */}
       {['warmup', 'main', 'accessory'].map((section) => {
         const sectionExercises = day.exercises.filter((e) => {
@@ -270,6 +439,9 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
                   weekNumber={weekNumber}
                   expanded={expandedId === exercise.id}
                   disabled={saved}
+                  exerciseSaved={savedExerciseIds.has(exercise.id)}
+                  exerciseSaving={savingExerciseId === exercise.id}
+                  workoutStarted={workoutStarted}
                   onToggle={() => setExpandedId((prev) => (prev === exercise.id ? null : exercise.id))}
                   onUpdate={(i, field, val) => updateSet(exercise.id, i, field, val)}
                   onToggleDone={(i) => toggleDoneSet(exercise.id, i)}
@@ -277,6 +449,8 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
                     tg?.HapticFeedback.impactOccurred('light')
                     setModalExercise(exercise)
                   }}
+                  onSaveExercise={() => saveExercise(exercise.id)}
+                  onEditExercise={() => editExercise(exercise.id)}
                 />
               ))}
             </div>
@@ -285,6 +459,18 @@ export function Workout({ workoutNumber, weekNumber, onBack, onDone }: Props) {
       })}
 
       <ExerciseModal exercise={modalExercise} onClose={() => setModalExercise(null)} />
+
+      {restTimer && (
+        <RestTimerBanner
+          seconds={restTimer.seconds}
+          mode={restTimer.mode}
+          onAdd={() => setRestTimer((prev) => (prev ? { ...prev, seconds: prev.seconds + 30 } : null))}
+          onSkip={() => {
+            tg?.HapticFeedback.impactOccurred('light')
+            setRestTimer(null)
+          }}
+        />
+      )}
 
       {/* Кнопка редактирования (показывается когда тренировка сохранена) */}
       {saved && (
@@ -342,13 +528,18 @@ interface CardProps {
   weekNumber: number
   expanded: boolean
   disabled: boolean
+  exerciseSaved: boolean
+  exerciseSaving: boolean
+  workoutStarted: boolean
   onToggle: () => void
   onUpdate: (index: number, field: 'weight' | 'reps', value: string) => void
   onToggleDone: (index: number) => void
   onInfo: () => void
+  onSaveExercise: () => void
+  onEditExercise: () => void
 }
 
-function ExerciseCard({ exercise, sets, doneSets, weekNumber, expanded, disabled, onToggle, onUpdate, onToggleDone, onInfo }: CardProps) {
+function ExerciseCard({ exercise, sets, doneSets, weekNumber, expanded, disabled, exerciseSaved, exerciseSaving, workoutStarted, onToggle, onUpdate, onToggleDone, onInfo, onSaveExercise, onEditExercise }: CardProps) {
   const target = getTargetReps(weekNumber, exercise.isAccessory ?? false, exercise.isWarmup ?? false)
   const filledSets = sets.filter((s) => !s.isWarmup && (s.weight != null || s.reps != null)).length
   const hitSets = sets.filter((s) => !s.isWarmup && getRepsStatus(s.reps, target) === 'hit').length
@@ -361,8 +552,8 @@ function ExerciseCard({ exercise, sets, doneSets, weekNumber, expanded, disabled
   return (
     <div style={{
       borderRadius: 14,
-      background: allDone ? 'rgba(52,199,89,0.06)' : 'var(--tg-theme-secondary-bg-color, #f8f8f8)',
-      border: allDone ? '1.5px solid #34c759' : '1px solid var(--tg-theme-secondary-bg-color, #e8e8e8)',
+      background: exerciseSaved && !disabled ? 'rgba(52,199,89,0.06)' : allDone ? 'rgba(52,199,89,0.06)' : 'var(--tg-theme-secondary-bg-color, #f8f8f8)',
+      border: exerciseSaved && !disabled ? '1.5px solid #34c759' : allDone ? '1.5px solid #34c759' : '1px solid var(--tg-theme-secondary-bg-color, #e8e8e8)',
       overflow: 'hidden',
       transition: 'border-color 0.2s, background 0.2s',
     }}>
@@ -417,6 +608,11 @@ function ExerciseCard({ exercise, sets, doneSets, weekNumber, expanded, disabled
                 {allDone ? '✅ выполнено' : `${doneCount}/${doneSets.length} подх.`}
               </span>
             )}
+            {exerciseSaved && !disabled && (
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#34c759' }}>
+                ✓ сохранено
+              </span>
+            )}
           </div>
         </div>
 
@@ -429,8 +625,8 @@ function ExerciseCard({ exercise, sets, doneSets, weekNumber, expanded, disabled
       {expanded && (
         <div style={{ padding: '0 16px 14px' }}>
           {/* Column headers */}
-          <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 1fr', gap: 8, marginBottom: 8 }}>
-            <span style={{ fontSize: 11, color: 'var(--tg-theme-hint-color, #999)', fontWeight: 600 }}>#</span>
+          <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 1fr', gap: 8, marginBottom: workoutStarted && doneCount === 0 && !(disabled || exerciseSaved) ? 4 : 8 }}>
+            <span style={{ fontSize: 11, color: 'var(--tg-theme-hint-color, #999)', fontWeight: 600 }}>☐</span>
             <span style={{ fontSize: 11, color: 'var(--tg-theme-hint-color, #999)', fontWeight: 600 }}>Вес (кг)</span>
             <div>
               <span style={{ fontSize: 11, color: 'var(--tg-theme-hint-color, #999)', fontWeight: 600 }}>
@@ -444,6 +640,15 @@ function ExerciseCard({ exercise, sets, doneSets, weekNumber, expanded, disabled
             </div>
           </div>
 
+          {workoutStarted && doneCount === 0 && !(disabled || exerciseSaved) && (
+            <p style={{
+              fontSize: 11, color: 'var(--tg-theme-button-color, #2481cc)',
+              marginBottom: 8, display: 'flex', alignItems: 'center', gap: 4,
+            }}>
+              ← нажми чтобы отметить подход выполненным
+            </p>
+          )}
+
           {sets.map((set, i) => {
             const status = set.isWarmup ? 'idle' : getRepsStatus(set.reps, target)
             const colors = STATUS_COLORS[status]
@@ -454,15 +659,27 @@ function ExerciseCard({ exercise, sets, doneSets, weekNumber, expanded, disabled
                 style={{ display: 'grid', gridTemplateColumns: '32px 1fr 1fr', gap: 8, marginBottom: 8, alignItems: 'center' }}
               >
                 <button
-                  onClick={() => !disabled && onToggleDone(i)}
-                  disabled={disabled}
+                  onClick={() => !(disabled || exerciseSaved) && onToggleDone(i)}
+                  disabled={disabled || exerciseSaved}
                   style={{
-                    width: 28, height: 28, borderRadius: 8,
-                    background: isDoneSet ? '#34c759' : set.isWarmup ? '#aaa' : 'var(--tg-theme-button-color, #2481cc)',
-                    color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 12, fontWeight: 700, flexShrink: 0,
-                    border: 'none', cursor: disabled ? 'default' : 'pointer',
-                    transition: 'background 0.15s',
+                    width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 12, fontWeight: 700,
+                    cursor: disabled || exerciseSaved ? 'default' : 'pointer',
+                    transition: 'all 0.15s',
+                    ...(isDoneSet
+                      ? { background: '#34c759', border: 'none', color: '#fff' }
+                      : workoutStarted && !(disabled || exerciseSaved)
+                        ? {
+                            background: 'transparent',
+                            border: `2px solid ${set.isWarmup ? '#aaa' : 'var(--tg-theme-button-color, #2481cc)'}`,
+                            color: set.isWarmup ? '#aaa' : 'var(--tg-theme-button-color, #2481cc)',
+                          }
+                        : {
+                            background: set.isWarmup ? '#aaa' : 'var(--tg-theme-button-color, #2481cc)',
+                            border: 'none',
+                            color: '#fff',
+                          }),
                   }}
                 >
                   {isDoneSet ? '✓' : set.isWarmup ? 'W' : set.setNumber}
@@ -473,8 +690,8 @@ function ExerciseCard({ exercise, sets, doneSets, weekNumber, expanded, disabled
                   placeholder="0"
                   value={set.weight ?? ''}
                   onChange={(e) => onUpdate(i, 'weight', e.target.value)}
-                  disabled={disabled}
-                  style={{ ...baseInputStyle, opacity: disabled ? 0.6 : 1 }}
+                  disabled={disabled || exerciseSaved}
+                  style={{ ...baseInputStyle, opacity: disabled || exerciseSaved ? 0.6 : 1 }}
                 />
                 <div style={{ position: 'relative' }}>
                   <input
@@ -483,14 +700,14 @@ function ExerciseCard({ exercise, sets, doneSets, weekNumber, expanded, disabled
                     placeholder={target ? `${target[0]}–${target[1]}` : '0'}
                     value={set.reps ?? ''}
                     onChange={(e) => onUpdate(i, 'reps', e.target.value)}
-                    disabled={disabled}
+                    disabled={disabled || exerciseSaved}
                     style={{
                       ...baseInputStyle,
                       border: `1.5px solid ${colors.border}`,
                       background: colors.bg,
                       fontWeight: status !== 'idle' ? 700 : 500,
                       color: status === 'hit' ? '#34c759' : status === 'low' ? '#ff9500' : status === 'high' ? '#ff3b30' : 'var(--tg-theme-text-color, #000)',
-                      opacity: disabled ? 0.6 : 1,
+                      opacity: disabled || exerciseSaved ? 0.6 : 1,
                     }}
                   />
                   {status === 'hit' && set.reps != null && (
@@ -512,8 +729,116 @@ function ExerciseCard({ exercise, sets, doneSets, weekNumber, expanded, disabled
               <LegendItem color="#ff3b30" label={`> ${target[1]} — снизь вес`} />
             </div>
           )}
+
+          {/* Per-exercise save / edit */}
+          {!disabled && (
+            exerciseSaved ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, padding: '8px 0' }}>
+                <span style={{ fontSize: 13, color: '#34c759', fontWeight: 600 }}>✓ Упражнение сохранено</span>
+                <button
+                  onClick={onEditExercise}
+                  style={{
+                    fontSize: 13, color: 'var(--tg-theme-button-color, #2481cc)', fontWeight: 600,
+                    background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 0',
+                  }}
+                >
+                  Редактировать
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={onSaveExercise}
+                disabled={exerciseSaving}
+                style={{
+                  width: '100%', marginTop: 12, padding: '10px 16px', borderRadius: 10,
+                  background: 'rgba(52,199,89,0.1)', border: '1.5px solid #34c759',
+                  color: '#34c759', fontWeight: 600, fontSize: 14,
+                  cursor: exerciseSaving ? 'default' : 'pointer',
+                  opacity: exerciseSaving ? 0.6 : 1,
+                }}
+              >
+                {exerciseSaving ? 'Сохраняю...' : '↓ Сохранить упражнение'}
+              </button>
+            )
+          )}
         </div>
       )}
+    </div>
+  )
+}
+
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
+interface RestTimerProps {
+  seconds: number
+  mode: 'set' | 'exercise'
+  onAdd: () => void
+  onSkip: () => void
+}
+
+function RestTimerBanner({ seconds, mode, onAdd, onSkip }: RestTimerProps) {
+  const isDone = seconds <= 0
+  const isLow = seconds <= 10 && seconds > 0
+
+  return (
+    <div style={{
+      position: 'fixed',
+      bottom: 0, left: 0, right: 0,
+      background: isDone ? 'rgba(52,199,89,0.95)' : 'var(--tg-theme-bg-color, #fff)',
+      borderTop: `2px solid ${isDone ? '#34c759' : isLow ? '#ff9500' : 'var(--tg-theme-secondary-bg-color, #e0e0e0)'}`,
+      padding: '14px 20px 28px',
+      boxShadow: '0 -6px 24px rgba(0,0,0,0.14)',
+      zIndex: 200,
+      transition: 'background 0.3s, border-color 0.3s',
+    }}>
+      <p style={{
+        fontSize: 11, fontWeight: 700, letterSpacing: 0.8,
+        textTransform: 'uppercase', textAlign: 'center', marginBottom: 10,
+        color: isDone ? '#fff' : 'var(--tg-theme-hint-color, #999)',
+      }}>
+        {isDone ? 'Время!' : mode === 'set' ? 'Отдых между подходами' : 'Отдых между упражнениями'}
+      </p>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20 }}>
+        <span style={{
+          fontSize: 48, fontWeight: 800, fontVariantNumeric: 'tabular-nums', lineHeight: 1,
+          color: isDone ? '#fff' : isLow ? '#ff9500' : 'var(--tg-theme-text-color, #000)',
+          minWidth: 110, textAlign: 'center',
+          transition: 'color 0.3s',
+        }}>
+          {formatTime(seconds)}
+        </span>
+
+        <button
+          onClick={onAdd}
+          style={{
+            padding: '10px 16px', borderRadius: 12, border: 'none',
+            background: isDone ? 'rgba(255,255,255,0.25)' : 'var(--tg-theme-secondary-bg-color, #f0f0f0)',
+            color: isDone ? '#fff' : 'var(--tg-theme-text-color, #000)',
+            fontWeight: 700, fontSize: 16, cursor: 'pointer',
+            flexShrink: 0,
+          }}
+        >
+          +30с
+        </button>
+      </div>
+
+      <button
+        onClick={onSkip}
+        style={{
+          display: 'block', margin: '10px auto 0',
+          background: 'transparent', border: 'none', cursor: 'pointer',
+          color: isDone ? 'rgba(255,255,255,0.8)' : 'var(--tg-theme-hint-color, #999)',
+          fontSize: 14, fontWeight: 500,
+          padding: '4px 16px',
+        }}
+      >
+        Пропустить →
+      </button>
     </div>
   )
 }

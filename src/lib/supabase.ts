@@ -148,6 +148,21 @@ export async function replaceSets(sessionId: string, sets: Omit<WorkoutSet, 'id'
   if (sets.length > 0) await saveSets(sets)
 }
 
+// Удаляет подходы конкретного упражнения в сессии и записывает новые
+export async function replaceExerciseSets(
+  sessionId: string,
+  exerciseId: string,
+  sets: Omit<WorkoutSet, 'id'>[],
+): Promise<void> {
+  const { error } = await supabase
+    .from('workout_sets')
+    .delete()
+    .eq('session_id', sessionId)
+    .eq('exercise_id', exerciseId)
+  if (error) throw error
+  if (sets.length > 0) await saveSets(sets)
+}
+
 export async function getCompletedWorkoutsForWeek(
   telegramUserId: number,
   weekNumber: number,

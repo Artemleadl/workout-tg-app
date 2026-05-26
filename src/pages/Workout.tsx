@@ -680,14 +680,17 @@ function ExerciseCard({ exercise, sets, doneSets, weekNumber, expanded, disabled
                   value={set.weight}
                   onChange={(v) => onUpdate(i, 'weight', v)}
                   step={2.5}
+                  min={0}
                   disabled={disabled || exerciseSaved}
+                  placeholder="кг"
                 />
                 <NumberSpinner
                   value={set.reps}
                   onChange={(v) => onUpdate(i, 'reps', v)}
                   step={1}
-                  placeholder={target ? `${target[0]}–${target[1]}` : '0'}
+                  min={1}
                   disabled={disabled || exerciseSaved}
+                  placeholder="повт"
                   borderColor={colors.border}
                   bgColor={colors.bg}
                   textColor={

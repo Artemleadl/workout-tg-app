@@ -111,9 +111,11 @@ function paintBackground(
   }
 
   if (bg.type === 'pattern') {
+    // 1. Solid base
     ctx.fillStyle = bg.color
     ctx.fillRect(0, 0, w, h)
 
+    // 2. Emoji scatter
     const positions = samplePattern(w, h, bg.size, bg.spacing)
     const rand = seededRand(w * 73856093 ^ h * 19349663)
 
@@ -131,6 +133,17 @@ function paintBackground(
       ctx.restore()
     }
     ctx.restore()
+
+    // 3. Radial vignette: transparent at centre → dark at corners
+    const cx = w / 2
+    const cy = h / 2
+    const outerR = Math.sqrt(cx * cx + cy * cy)
+    const vignette = ctx.createRadialGradient(cx, cy, 0, cx, cy, outerR)
+    vignette.addColorStop(0,   'rgba(0,0,0,0)')
+    vignette.addColorStop(0.45,'rgba(0,0,0,0)')
+    vignette.addColorStop(1,   'rgba(0,0,0,0.52)')
+    ctx.fillStyle = vignette
+    ctx.fillRect(0, 0, w, h)
   }
 }
 

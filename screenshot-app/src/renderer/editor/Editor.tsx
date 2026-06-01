@@ -256,7 +256,7 @@ export function Editor(): React.ReactElement {
 
   const doCopy = async (): Promise<void> => {
     await window.api.editorCopy(exportDataUrl())
-    setStatus('Copied to clipboard')
+    void window.api.editorClose()
   }
 
   const doSave = async (): Promise<void> => {

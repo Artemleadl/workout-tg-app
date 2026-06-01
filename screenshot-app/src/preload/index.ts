@@ -6,7 +6,8 @@ import {
   type OverlayPayload,
   type SaveResult,
   type Settings,
-  type UploadResult
+  type UploadResult,
+  type WindowRect
 } from '../shared/types'
 
 const api = {
@@ -22,6 +23,9 @@ const api = {
   overlaySelect: (payload: EditorPayload): Promise<void> =>
     ipcRenderer.invoke(IPC.overlaySelect, payload),
   overlayCancel: (): Promise<void> => ipcRenderer.invoke(IPC.overlayCancel),
+
+  // Overlay: request window list from main (pull, resolves when detection is done)
+  getWindowList: (): Promise<WindowRect[]> => ipcRenderer.invoke(IPC.getWindowList),
 
   // Editor window
   requestEditorData: (): Promise<EditorPayload | null> =>

@@ -66,3 +66,64 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+/* Hint shown when selection is ready to confirm */
+.overlay-confirm-hint {
+  position: absolute;
+  bottom: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 10px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Window detection highlight */
+.window-highlight {
+  position: absolute;
+  border: 2px solid rgba(30, 140, 255, 0.9);
+  background: rgba(30, 140, 255, 0.12);
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.window-highlight-label {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(30, 140, 255, 0.85);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Resize handles */
+.resize-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #fff;
+  border: 1.5px solid var(--accent);
+  border-radius: 2px;
+  z-index: 10;
+}
+
+.resize-nw { top: -5px; left: -5px; }
+.resize-ne { top: -5px; right: -5px; }
+.resize-sw { bottom: -5px; left: -5px; }
+.resize-se { bottom: -5px; right: -5px; }
+.resize-n  { top: -5px; left: calc(50% - 4px); }
+.resize-s  { bottom: -5px; left: calc(50% - 4px); }
+.resize-w  { top: calc(50% - 4px); left: -5px; }
+.resize-e  { top: calc(50% - 4px); right: -5px; }

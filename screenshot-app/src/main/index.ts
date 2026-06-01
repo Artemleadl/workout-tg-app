@@ -1,5 +1,6 @@
 import { join } from 'node:path'
 import { writeFile, mkdir } from 'node:fs/promises'
+import { listVisibleWindowsAsync, type WindowRect } from './window-list'
 import {
   app,
   BrowserWindow,
@@ -29,6 +30,9 @@ import { createEditorWindow, createOverlayWindow, createSettingsWindow } from '.
 let tray: Tray | null = null
 let overlayWindow: BrowserWindow | null = null
 let settingsWindow: BrowserWindow | null = null
+
+// Cached promise for the current overlay session's window list
+let windowListPromise: Promise<WindowRect[]> | null = null
 
 // Each capture window pulls its payload on mount, keyed by webContents id.
 const editorPayloads = new Map<number, EditorPayload>()
@@ -100,6 +104,20 @@ async function startCapture(mode: CaptureMode): Promise<void> {
     win.on('closed', () => {
       overlayPayloads.delete(id)
       if (overlayWindow === win) overlayWindow = null
+    })
+
+    // Start async window detection — renderer pulls result when ready via IPC.
+    const { x: dx, y: dy, width: dw, height: dh } = payload.display.bounds
+    windowListPromise = listVisibleWindowsAsync().then((allWins) => {
+      return allWins
+        .filter(w => w.x < dx + dw && w.x + w.w > dx && w.y < dy + dh && w.y + w.h > dy)
+        .map(w => ({
+          name: w.name,
+          x: Math.max(0, w.x - dx),
+          y: Math.max(0, w.y - dy),
+          w: Math.min(w.w, dw - Math.max(0, w.x - dx)),
+          h: Math.min(w.h, dh - Math.max(0, w.y - dy))
+        }))
     })
   } catch (err) {
     dialog.showErrorBox('Capture failed', err instanceof Error ? err.message : String(err))
@@ -179,6 +197,11 @@ function registerIpc(): void {
   })
 
   ipcMain.handle(IPC.triggerCapture, (_e, mode: CaptureMode) => startCapture(mode))
+
+  ipcMain.handle(IPC.getWindowList, async (): Promise<WindowRect[]> => {
+    if (!windowListPromise) return []
+    return windowListPromise
+  })
 
   ipcMain.handle(IPC.requestOverlay, (e): OverlayPayload | null => overlayPayloads.get(e.sender.id) ?? null)
   ipcMain.handle(IPC.requestEditor, (e): EditorPayload | null => editorPayloads.get(e.sender.id) ?? null)

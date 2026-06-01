@@ -89,6 +89,15 @@ export const DEFAULT_SETTINGS: Settings = {
   }
 }
 
+// A detected on-screen window, in display-local points (origin = display top-left).
+export interface WindowRect {
+  x: number
+  y: number
+  w: number
+  h: number
+  name: string
+}
+
 // IPC channel names, kept in one place so main/preload/renderer stay in sync.
 // All channels are renderer -> main invoke()s; windows pull their data on
 // mount (rather than main pushing it) to avoid a load/subscribe race.
@@ -104,5 +113,7 @@ export const IPC = {
   getSettings: 'settings:get',
   setSettings: 'settings:set',
   pickSaveDirectory: 'settings:pickSaveDirectory',
-  triggerCapture: 'capture:trigger'
+  triggerCapture: 'capture:trigger',
+  // overlay renderer → main: request detected window list (pull)
+  getWindowList: 'overlay:window-list'
 } as const

@@ -3,11 +3,11 @@ import type { Background, Frame } from './frame'
 interface Preset {
   label: string
   bg: Background
-  // CSS used purely for the swatch preview in the toolbar.
-  swatch: string
+  swatch: string       // CSS for the color chip
+  emoji?: string       // shown on top of chip for pattern presets
 }
 
-const PRESETS: Preset[] = [
+const SOLID_PRESETS: Preset[] = [
   { label: 'None', bg: { type: 'none' }, swatch: 'transparent' },
   { label: 'White', bg: { type: 'solid', color: '#ffffff' }, swatch: '#ffffff' },
   { label: 'Graphite', bg: { type: 'solid', color: '#2a2a32' }, swatch: '#2a2a32' },
@@ -33,6 +33,57 @@ const PRESETS: Preset[] = [
   }
 ]
 
+const PATTERN_PRESETS: Preset[] = [
+  {
+    label: 'Money',
+    bg: { type: 'pattern', color: '#5b8fc5', emoji: '💰', opacity: 0.18, size: 28, spacing: 52 },
+    swatch: '#5b8fc5',
+    emoji: '💰'
+  },
+  {
+    label: 'Stars',
+    bg: { type: 'pattern', color: '#6c3483', emoji: '⭐', opacity: 0.2, size: 26, spacing: 48 },
+    swatch: '#6c3483',
+    emoji: '⭐'
+  },
+  {
+    label: 'Fire',
+    bg: { type: 'pattern', color: '#c0392b', emoji: '🔥', opacity: 0.2, size: 28, spacing: 52 },
+    swatch: '#c0392b',
+    emoji: '🔥'
+  },
+  {
+    label: 'Diamond',
+    bg: { type: 'pattern', color: '#1a5276', emoji: '💎', opacity: 0.2, size: 26, spacing: 50 },
+    swatch: '#1a5276',
+    emoji: '💎'
+  },
+  {
+    label: 'Rocket',
+    bg: { type: 'pattern', color: '#1e293b', emoji: '🚀', opacity: 0.2, size: 28, spacing: 52 },
+    swatch: '#1e293b',
+    emoji: '🚀'
+  },
+  {
+    label: 'Cherry',
+    bg: { type: 'pattern', color: '#c2185b', emoji: '🌸', opacity: 0.22, size: 26, spacing: 48 },
+    swatch: '#c2185b',
+    emoji: '🌸'
+  },
+  {
+    label: 'Ice',
+    bg: { type: 'pattern', color: '#1565c0', emoji: '❄️', opacity: 0.2, size: 26, spacing: 48 },
+    swatch: '#1565c0',
+    emoji: '❄️'
+  },
+  {
+    label: 'Nature',
+    bg: { type: 'pattern', color: '#1b5e20', emoji: '🌿', opacity: 0.22, size: 26, spacing: 48 },
+    swatch: '#1b5e20',
+    emoji: '🌿'
+  }
+]
+
 function sameBg(a: Background, b: Background): boolean {
   return JSON.stringify(a) === JSON.stringify(b)
 }
@@ -45,9 +96,10 @@ interface Props {
 export function FrameBar({ frame, setFrame }: Props): React.ReactElement {
   return (
     <div className="framebar">
+      {/* Solid / gradient presets */}
       <div className="toolbar-group">
         <span className="framebar-label">Background</span>
-        {PRESETS.map((p) => (
+        {SOLID_PRESETS.map((p) => (
           <button
             key={p.label}
             className={sameBg(frame.background, p.bg) ? 'bg-swatch active' : 'bg-swatch'}
@@ -56,6 +108,22 @@ export function FrameBar({ frame, setFrame }: Props): React.ReactElement {
             onClick={() => setFrame({ ...frame, background: p.bg })}
           >
             {p.bg.type === 'none' && <span className="bg-none">∅</span>}
+          </button>
+        ))}
+      </div>
+
+      {/* Pattern presets */}
+      <div className="toolbar-group">
+        <span className="framebar-label">Pattern</span>
+        {PATTERN_PRESETS.map((p) => (
+          <button
+            key={p.label}
+            className={sameBg(frame.background, p.bg) ? 'bg-swatch active' : 'bg-swatch'}
+            style={{ background: p.swatch }}
+            title={p.label}
+            onClick={() => setFrame({ ...frame, background: p.bg })}
+          >
+            <span style={{ fontSize: 13, lineHeight: 1 }}>{p.emoji}</span>
           </button>
         ))}
       </div>

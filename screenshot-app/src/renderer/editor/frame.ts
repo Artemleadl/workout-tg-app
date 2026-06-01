@@ -7,6 +7,7 @@ export type Background =
   | { type: 'none' }
   | { type: 'solid'; color: string }
   | { type: 'gradient'; from: string; to: string; angle: number }
+  | { type: 'pattern'; color: string; emoji: string; opacity: number; size: number; spacing: number }
 
 export interface Frame {
   padding: number
@@ -54,22 +55,46 @@ function paintBackground(
   bg: Background
 ): void {
   if (bg.type === 'none') return
+
   if (bg.type === 'solid') {
     ctx.fillStyle = bg.color
     ctx.fillRect(0, 0, w, h)
     return
   }
-  const rad = (bg.angle * Math.PI) / 180
-  const cx = w / 2
-  const cy = h / 2
-  const len = (Math.abs(Math.cos(rad)) * w + Math.abs(Math.sin(rad)) * h) / 2
-  const dx = Math.cos(rad) * len
-  const dy = Math.sin(rad) * len
-  const grad = ctx.createLinearGradient(cx - dx, cy - dy, cx + dx, cy + dy)
-  grad.addColorStop(0, bg.from)
-  grad.addColorStop(1, bg.to)
-  ctx.fillStyle = grad
-  ctx.fillRect(0, 0, w, h)
+
+  if (bg.type === 'gradient') {
+    const rad = (bg.angle * Math.PI) / 180
+    const cx = w / 2
+    const cy = h / 2
+    const len = (Math.abs(Math.cos(rad)) * w + Math.abs(Math.sin(rad)) * h) / 2
+    const dx = Math.cos(rad) * len
+    const dy = Math.sin(rad) * len
+    const grad = ctx.createLinearGradient(cx - dx, cy - dy, cx + dx, cy + dy)
+    grad.addColorStop(0, bg.from)
+    grad.addColorStop(1, bg.to)
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, w, h)
+    return
+  }
+
+  if (bg.type === 'pattern') {
+    // Solid base color
+    ctx.fillStyle = bg.color
+    ctx.fillRect(0, 0, w, h)
+    // Tiled emoji pattern
+    ctx.save()
+    ctx.globalAlpha = bg.opacity
+    ctx.font = `${bg.size}px serif`
+    ctx.textBaseline = 'middle'
+    const sp = bg.spacing
+    for (let row = -1; row * sp < h + sp; row++) {
+      const offsetX = (row % 2 === 0) ? 0 : sp * 0.5
+      for (let col = -1; col * sp + offsetX < w + sp; col++) {
+        ctx.fillText(bg.emoji, col * sp + offsetX, row * sp + bg.size * 0.5)
+      }
+    }
+    ctx.restore()
+  }
 }
 
 // Draw the full framed image (no selection handles) into a context whose

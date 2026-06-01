@@ -7,6 +7,7 @@ interface Preset {
   emoji?: string
 }
 
+// size = emoji font size px; spacing = minimum distance between centres
 const PRESETS: Preset[] = [
   {
     label: 'None',
@@ -20,61 +21,61 @@ const PRESETS: Preset[] = [
   },
   {
     label: 'Graphite',
-    bg: { type: 'pattern', color: '#2a2a32', emoji: '✦', opacity: 0.12, size: 20, spacing: 36 },
+    bg: { type: 'pattern', color: '#2a2a32', emoji: '✦', opacity: 0.09, size: 44, spacing: 90 },
     swatch: '#2a2a32',
     emoji: '✦'
   },
   {
     label: 'Sunset',
-    bg: { type: 'pattern', color: '#e75480', emoji: '🌸', opacity: 0.2, size: 26, spacing: 48 },
+    bg: { type: 'pattern', color: '#d64f6e', emoji: '🌸', opacity: 0.09, size: 48, spacing: 96 },
     swatch: 'linear-gradient(135deg,#ff6a88,#ff99ac)',
     emoji: '🌸'
   },
   {
     label: 'Ocean',
-    bg: { type: 'pattern', color: '#2193b0', emoji: '🌊', opacity: 0.18, size: 26, spacing: 48 },
+    bg: { type: 'pattern', color: '#2193b0', emoji: '🌊', opacity: 0.09, size: 48, spacing: 96 },
     swatch: 'linear-gradient(135deg,#2193b0,#6dd5ed)',
     emoji: '🌊'
   },
   {
     label: 'Violet',
-    bg: { type: 'pattern', color: '#6c3483', emoji: '⭐', opacity: 0.2, size: 24, spacing: 44 },
+    bg: { type: 'pattern', color: '#6c3483', emoji: '⭐', opacity: 0.1, size: 44, spacing: 88 },
     swatch: 'linear-gradient(135deg,#7028e4,#e5b2ca)',
     emoji: '⭐'
   },
   {
     label: 'Mint',
-    bg: { type: 'pattern', color: '#11998e', emoji: '🌿', opacity: 0.2, size: 24, spacing: 44 },
+    bg: { type: 'pattern', color: '#11998e', emoji: '🌿', opacity: 0.1, size: 44, spacing: 88 },
     swatch: 'linear-gradient(135deg,#11998e,#38ef7d)',
     emoji: '🌿'
   },
   {
     label: 'Money',
-    bg: { type: 'pattern', color: '#5b8fc5', emoji: '💰', opacity: 0.18, size: 28, spacing: 52 },
+    bg: { type: 'pattern', color: '#5b8fc5', emoji: '💰', opacity: 0.09, size: 48, spacing: 96 },
     swatch: '#5b8fc5',
     emoji: '💰'
   },
   {
     label: 'Fire',
-    bg: { type: 'pattern', color: '#c0392b', emoji: '🔥', opacity: 0.2, size: 28, spacing: 52 },
+    bg: { type: 'pattern', color: '#c0392b', emoji: '🔥', opacity: 0.09, size: 48, spacing: 96 },
     swatch: '#c0392b',
     emoji: '🔥'
   },
   {
     label: 'Diamond',
-    bg: { type: 'pattern', color: '#1a5276', emoji: '💎', opacity: 0.2, size: 26, spacing: 50 },
+    bg: { type: 'pattern', color: '#1a5276', emoji: '💎', opacity: 0.1, size: 46, spacing: 92 },
     swatch: '#1a5276',
     emoji: '💎'
   },
   {
     label: 'Space',
-    bg: { type: 'pattern', color: '#1e293b', emoji: '🚀', opacity: 0.2, size: 28, spacing: 52 },
+    bg: { type: 'pattern', color: '#1e293b', emoji: '🚀', opacity: 0.09, size: 48, spacing: 96 },
     swatch: '#1e293b',
     emoji: '🚀'
   },
   {
     label: 'Ice',
-    bg: { type: 'pattern', color: '#1565c0', emoji: '❄️', opacity: 0.2, size: 26, spacing: 48 },
+    bg: { type: 'pattern', color: '#1565c0', emoji: '❄️', opacity: 0.1, size: 46, spacing: 92 },
     swatch: '#1565c0',
     emoji: '❄️'
   }

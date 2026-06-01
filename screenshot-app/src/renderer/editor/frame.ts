@@ -48,6 +48,39 @@ function roundedRectPath(
   ctx.closePath()
 }
 
+// Seeded LCG RNG — stable pattern across redraws for the same dimensions
+function seededRand(seed: number): () => number {
+  let s = (seed ^ 0xdeadbeef) >>> 0
+  return () => {
+    s = Math.imul(s ^ (s >>> 15), s | 1)
+    s ^= s + Math.imul(s ^ (s >>> 7), s | 61)
+    return ((s ^ (s >>> 14)) >>> 0) / 0x100000000
+  }
+}
+
+// Random non-overlapping placement — returns [x, y] pairs
+function samplePattern(w: number, h: number, size: number, minDist: number): [number, number][] {
+  const rand = seededRand(w * 19 + h * 31)
+  const margin = size * 0.6
+  const placed: [number, number][] = []
+  // Attempt to place up to N candidates; area-based count keeps density consistent
+  const candidates = Math.round((w * h) / (minDist * minDist * 1.4))
+  for (let i = 0; i < candidates; i++) {
+    let ok = false
+    for (let t = 0; t < 30; t++) {
+      const x = margin + rand() * (w - margin * 2)
+      const y = margin + rand() * (h - margin * 2)
+      if (placed.every(([px, py]) => Math.hypot(px - x, py - y) >= minDist)) {
+        placed.push([x, y])
+        ok = true
+        break
+      }
+    }
+    if (!ok && placed.length > 2) break // canvas is saturated, stop early
+  }
+  return placed
+}
+
 function paintBackground(
   ctx: CanvasRenderingContext2D,
   w: number,
@@ -78,20 +111,24 @@ function paintBackground(
   }
 
   if (bg.type === 'pattern') {
-    // Solid base color
     ctx.fillStyle = bg.color
     ctx.fillRect(0, 0, w, h)
-    // Tiled emoji pattern
+
+    const positions = samplePattern(w, h, bg.size, bg.spacing)
+    const rand = seededRand(w * 73856093 ^ h * 19349663)
+
     ctx.save()
     ctx.globalAlpha = bg.opacity
     ctx.font = `${bg.size}px serif`
     ctx.textBaseline = 'middle'
-    const sp = bg.spacing
-    for (let row = -1; row * sp < h + sp; row++) {
-      const offsetX = (row % 2 === 0) ? 0 : sp * 0.5
-      for (let col = -1; col * sp + offsetX < w + sp; col++) {
-        ctx.fillText(bg.emoji, col * sp + offsetX, row * sp + bg.size * 0.5)
-      }
+    ctx.textAlign = 'center'
+
+    for (const [px, py] of positions) {
+      ctx.save()
+      ctx.translate(px, py)
+      ctx.rotate((rand() - 0.5) * Math.PI * 0.6)
+      ctx.fillText(bg.emoji, 0, 0)
+      ctx.restore()
     }
     ctx.restore()
   }

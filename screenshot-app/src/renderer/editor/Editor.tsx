@@ -4,6 +4,16 @@ import { bounds, hitTest, newId, translate, type Annotation, type Point, type To
 import { Toolbar } from './Toolbar'
 import { FrameBar } from './FrameBar'
 import { composeFrame, DEFAULT_FRAME, frameSize, type Frame } from './frame'
+
+const FRAME_STORAGE_KEY = 'snapshot-studio:frame'
+
+function loadSavedFrame(): Frame {
+  try {
+    const raw = localStorage.getItem(FRAME_STORAGE_KEY)
+    if (raw) return { ...DEFAULT_FRAME, ...JSON.parse(raw) }
+  } catch {}
+  return DEFAULT_FRAME
+}
 import './editor.css'
 
 interface TextDraft {
@@ -33,7 +43,7 @@ export function Editor(): React.ReactElement {
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(false)
   const [uploadEnabled, setUploadEnabled] = useState(false)
-  const [frame, setFrame] = useState<Frame>(DEFAULT_FRAME)
+  const [frame, setFrame] = useState<Frame>(loadSavedFrame)
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const baseRef = useRef<HTMLImageElement | null>(null)
@@ -42,6 +52,11 @@ export function Editor(): React.ReactElement {
   const stepRef = useRef(1)
 
   annsRef.current = annotations
+
+  // Persist frame settings across sessions
+  useEffect(() => {
+    try { localStorage.setItem(FRAME_STORAGE_KEY, JSON.stringify(frame)) } catch {}
+  }, [frame])
 
   // --- Load capture + settings ---------------------------------------------
   useEffect(() => {
